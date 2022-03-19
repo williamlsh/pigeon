@@ -9,6 +9,7 @@ use pigeon::{
         user::User,
         API_ENDPOINT_BASE,
     },
+    utils,
 };
 use std::{
     collections::HashMap,
@@ -89,7 +90,8 @@ fn main() {
             }
 
             let cf_handle = cf_handles_map.get(cf.as_str()).unwrap().unwrap();
-            db.put_cf(cf_handle, &page.to_string(), &timeline).unwrap();
+            let key = utils::timestamp();
+            db.put_cf(cf_handle, &key.to_string(), &timeline).unwrap();
         }
     }
 }
