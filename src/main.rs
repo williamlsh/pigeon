@@ -48,10 +48,10 @@ fn main() {
         .iter()
         .map(|user_id| Database::cf_timeline_from_user_id(user_id))
         .collect();
-    let db = Database::open(&args.rocksdb_path, &cfs);
+    let db = Database::open_with_cfs(&args.rocksdb_path, &cfs);
     // Column family handles map to user_ids.
     let cf_handles_map = db.get_cf_handles(&cfs);
-    let last_items_in_cfs_map: HashMap<&str, Option<Timeline>> = db.last_items_in_cfs(&cfs);
+    let last_items_in_cfs_map: HashMap<&str, Option<Timeline>> = db.last_kv_pair_in_cfs(&cfs);
 
     'loop_user_ids: for user_id in user_ids {
         info!("starting to archive timeline for user of id: {}", user_id);
@@ -65,6 +65,7 @@ fn main() {
 
         // Get column family name.
         let cf = Database::cf_timeline_from_user_id(&user_id);
+        // Continue from last pagination token.
         let pagination_token = match last_items_in_cfs_map.get(cf.as_str()).unwrap() {
             Some(timeline) => timeline.next_token(),
             None => None,
