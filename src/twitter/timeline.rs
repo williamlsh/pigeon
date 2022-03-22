@@ -1,5 +1,5 @@
-use crate::client::ReusableBlockingClient;
-use log::{debug, error, info, trace, warn};
+use log::{error, info, trace, warn};
+use reqwest::blocking::Client;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -23,20 +23,6 @@ impl UrlBuilder {
         self
     }
 
-    pub fn expansions(mut self, expansions: Vec<&str>) -> Self {
-        self.0
-            .query_pairs_mut()
-            .append_pair("expansions", &expansions.join(","));
-        self
-    }
-
-    pub fn media_fields(mut self, media_fields: Vec<&str>) -> Self {
-        self.0
-            .query_pairs_mut()
-            .append_pair("media.fields", &media_fields.join(","));
-        self
-    }
-
     pub fn max_results(mut self, max_results: u8) -> Self {
         self.0
             .query_pairs_mut()
@@ -52,21 +38,24 @@ impl UrlBuilder {
 /// A PaginatedTimeline only supports one twitter user's timeline.
 #[derive(Debug)]
 pub struct PaginatedTimeline<'a> {
-    client: &'a ReusableBlockingClient,
+    client: &'a Client,
     url: Url,
+    auth_token: &'a str,
     pagination_token: Option<String>,
     page: usize,
 }
 
 impl<'a> PaginatedTimeline<'a> {
     pub fn new(
-        client: &'a ReusableBlockingClient,
+        client: &'a Client,
         url: Url,
+        auth_token: &'a str,
         pagination_token: Option<String>,
     ) -> Self {
         Self {
             client,
             url,
+            auth_token,
             pagination_token,
             page: 0,
         }
@@ -86,13 +75,14 @@ impl<'a> PaginatedTimeline<'a> {
                 }
             },
         };
-        debug!("current url: {}", url.as_str());
 
-        // Check response status.
         let response = self
             .client
-            .get(&url)
+            .get(url)
+            .bearer_auth(self.auth_token)
+            .send()
             .map_err(|error| format!("get request failed: {:?}", error))?;
+        // Check response status.
         match response.status() {
             StatusCode::OK => {
                 let timeline: Timeline = response
@@ -101,10 +91,7 @@ impl<'a> PaginatedTimeline<'a> {
                 trace!("got timeline: {:?}", timeline);
 
                 // Keep the pagination token for next request.
-                match timeline.meta.clone() {
-                    Some(meta) => self.pagination_token = meta.next_token,
-                    None => return Ok(None),
-                }
+                self.pagination_token = timeline.meta.next_token.clone();
 
                 // Increase page number on request success.
                 self.page += 1;
@@ -118,7 +105,11 @@ impl<'a> PaginatedTimeline<'a> {
                 Ok(None)
             }
             x => {
-                warn!("request not successful, got response status: {}", x);
+                warn!(
+                    "request not successful, got response status: {} and body: {}",
+                    x,
+                    response.text().unwrap_or_else(|_| "".to_string())
+                );
                 Ok(None)
             }
         }
@@ -154,55 +145,23 @@ impl<'a> Iterator for PaginatedTimeline<'a> {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Timeline {
-    data: Option<Vec<Data>>,
-    includes: Option<Includes>,
-    meta: Option<Meta>,
-}
-
-impl Timeline {
-    pub fn next_token(&self) -> Option<String> {
-        match &self.meta {
-            Some(meta) => meta.next_token.clone(),
-            None => None,
-        }
-    }
+    pub data: Option<Vec<Data>>,
+    pub meta: Meta,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-struct Data {
+pub struct Data {
     id: String,
-    created_at: String,
-    attachments: Option<Attachments>,
-    text: String,
+    pub created_at: String,
+    pub text: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-struct Attachments {
-    media_keys: Vec<String>,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-struct Includes {
-    media: Vec<Media>,
-    tweets: Option<Vec<Data>>,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-struct Media {
-    width: Option<u16>,
-    media_key: String,
-    height: Option<u16>,
-    #[serde(rename = "type")]
-    typ: String,
-    url: Option<String>,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-struct Meta {
+pub struct Meta {
     oldest_id: String,
     newest_id: String,
-    result_count: usize,
-    next_token: Option<String>,
+    result_count: u8,
+    pub next_token: Option<String>,
 }
 
 #[cfg(test)]
@@ -229,12 +188,10 @@ mod tests {
         let base_url = Url::parse(API_ENDPOINT_BASE).unwrap();
         let url = UrlBuilder::new(&base_url, USER_ID)
             .tweet_fields(vec!["a", "b", "c"])
-            .expansions(vec!["a", "b", "c"])
-            .media_fields(vec!["a", "b", "c"])
             .max_results(100);
 
         assert_eq!(
-            "tweet.fields=a%2Cb%2Cc&expansions=a%2Cb%2Cc&media.fields=a%2Cb%2Cc&max_results=100",
+            "tweet.fields=a%2Cb%2Cc&max_results=100",
             url.0.query().unwrap()
         );
     }

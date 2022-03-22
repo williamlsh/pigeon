@@ -1,3 +1,4 @@
 /target
 /fixture
 /rocksdb
+.env

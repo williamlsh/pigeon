@@ -1,16 +1,17 @@
 use crate::utils;
-use log::{error, info};
 use rocksdb::{
     AsColumnFamilyRef, ColumnFamily, ColumnFamilyDescriptor, DBIterator, Direction, IteratorMode,
-    Options, DB,
+    Options, WriteBatch, DB,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use std::{collections::HashMap, path::Path};
+use std::{fmt::Display, path::Path};
 
 const COLUMN_FAMILY_TIMELINE_PREFIX: &str = "timeline";
+pub const COLUMN_FAMILY_USER_INFO: &str = "user_info";
+pub const COLUMN_FAMILY_SYNC_CURSOR: &str = "sync_cursor";
 
 #[derive(Debug)]
-pub struct Database(DB);
+pub struct Database(pub DB);
 
 impl Database {
     pub fn open_with_cfs<P: AsRef<Path>>(path: P, cfs: &[String]) -> Self {
@@ -29,10 +30,8 @@ impl Database {
         Self(db)
     }
 
-    pub fn get_cf_handles<'a>(&self, cfs: &'a [String]) -> HashMap<&'a str, Option<&ColumnFamily>> {
-        cfs.iter()
-            .map(|cf| (cf.as_str(), self.0.cf_handle(cf)))
-            .collect()
+    pub fn cf_handle(&self, cf: &str) -> Option<&ColumnFamily> {
+        self.0.cf_handle(cf)
     }
 
     pub fn put_cf<T>(
@@ -70,36 +69,45 @@ impl Database {
         }
     }
 
-    pub fn last_kv_pair_in_cfs<'a, T: DeserializeOwned>(
-        &self,
-        cfs: &'a [String],
-    ) -> HashMap<&'a str, Option<T>> {
-        cfs.iter()
-            .map(|cf| match self.0.cf_handle(cf) {
-                Some(cf_handle) => match self.0.iterator_cf(cf_handle, IteratorMode::End).next() {
-                    Some((_, value)) => match utils::deserialize_from_bytes(value.to_vec()) {
-                        Ok(value) => (cf.as_str(), value),
-                        Err(error) => {
-                            error!("could not deserialize from bytes: {:?}", error);
-                            (cf.as_str(), None)
-                        }
-                    },
-                    None => {
-                        info!("no last found item from {}", cf);
-                        (cf.as_str(), None)
-                    }
-                },
-                None => (cf.as_str(), None),
-            })
-            .collect()
+    pub fn last_kv_in_cf(&self, cf: &str) -> Option<(Box<[u8]>, Box<[u8]>)> {
+        match self.0.cf_handle(cf) {
+            Some(cf_handle) => self.0.iterator_cf(cf_handle, IteratorMode::End).next(),
+            None => None,
+        }
     }
 
-    pub fn cf_timeline_from_user_id(user_id: &str) -> String {
-        format!("{}:{}", COLUMN_FAMILY_TIMELINE_PREFIX, user_id)
+    pub fn cf_timeline_from_username<T: AsRef<str> + Display>(username: T) -> String {
+        format!("{}:{}", COLUMN_FAMILY_TIMELINE_PREFIX, username)
+    }
+
+    pub fn batch_put_cf(&self, cf: &str, kvs: Vec<(&str, &str)>) -> Result<(), String> {
+        let cf_handle = match self.cf_handle(cf) {
+            Some(cf_handle) => cf_handle,
+            None => {
+                return Err(format!(
+                    "could not get column family handle associated with this name: {}",
+                    cf
+                ))
+            }
+        };
+
+        let mut batch = WriteBatch::default();
+        for (key, value) in kvs {
+            batch.put_cf(cf_handle, key, value);
+        }
+        self.0
+            .write(batch)
+            .map_err(|error| format!("could not write batch: {:?}", error))?;
+
+        Ok(())
     }
 
     // Returns a `DBIterator` over a column family since start, optionally from a key forward.
-    fn iter_cf_since(&self, cf_handle: &impl AsColumnFamilyRef, key: Option<&[u8]>) -> DBIterator {
+    pub fn iter_cf_since(
+        &self,
+        cf_handle: &impl AsColumnFamilyRef,
+        key: Option<&[u8]>,
+    ) -> DBIterator {
         match key {
             Some(key) => self
                 .0
@@ -112,16 +120,17 @@ impl Database {
 #[cfg(test)]
 mod tests {
     use super::Database;
-    use rocksdb::{Options, DB};
-    use std::collections::HashMap;
+    use crate::utils;
+    use rocksdb::{ColumnFamily, Options, DB};
 
     #[test]
     fn test_open_with_cfs() {
         let cfs = [String::from("1"), String::from("2")];
         let db = Database::open_with_cfs("test", &cfs);
-        let cf_handles = db.get_cf_handles(&cfs);
+        let cf_handles: Vec<Option<&ColumnFamily>> =
+            cfs.iter().map(|cf| db.cf_handle(cf)).collect();
         cf_handles
-            .into_values()
+            .iter()
             .for_each(|cf_handle| assert!(cf_handle.is_some()));
 
         drop(db);
@@ -132,12 +141,13 @@ mod tests {
     fn test_put_cf() {
         let cfs = [String::from("1"), String::from("2")];
         let db = Database::open_with_cfs("test", &cfs);
-        let cf_handles = db.get_cf_handles(&cfs);
+        let cf_handles: Vec<Option<&ColumnFamily>> =
+            cfs.iter().map(|cf| db.cf_handle(cf)).collect();
 
-        let cf_handles_1 = cf_handles.get("1").unwrap().unwrap();
-        db.put_cf(cf_handles_1, "x", "y").unwrap();
-        let cf_handles_2 = cf_handles.get("2").unwrap().unwrap();
-        db.put_cf(cf_handles_2, "a", "b").unwrap();
+        cf_handles.iter().enumerate().for_each(|(i, cf_handle)| {
+            db.put_cf(cf_handle.unwrap(), &i.to_string(), &i.to_string())
+                .unwrap()
+        });
 
         drop(db);
         DB::destroy(&Options::default(), "test").unwrap();
@@ -147,12 +157,11 @@ mod tests {
     fn test_get_cf() {
         let cfs = [String::from("1")];
         let db = Database::open_with_cfs("test", &cfs);
-        let cf_handles = db.get_cf_handles(&cfs);
 
-        let cf_handles_1 = cf_handles.get("1").unwrap().unwrap();
-        db.put_cf(cf_handles_1, "x", "y").unwrap();
+        let cf_handle = db.cf_handle("1").unwrap();
+        db.put_cf(cf_handle, "x", "y").unwrap();
 
-        let value: String = db.get_cf(cf_handles_1, "x").unwrap().unwrap();
+        let value: String = db.get_cf(cf_handle, "x").unwrap().unwrap();
         assert_eq!("y", value);
 
         drop(db);
@@ -160,35 +169,44 @@ mod tests {
     }
 
     #[test]
-    fn test_last_kv_pair_in_cfs() {
+    fn test_last_kv_in_cf() {
         let cfs = [String::from("1")];
         let db = Database::open_with_cfs("test", &cfs);
-        let cf_handles = db.get_cf_handles(&cfs);
 
-        let cf_handles_1 = cf_handles.get("1").unwrap().unwrap();
-        db.put_cf(cf_handles_1, "a", "b").unwrap();
-        db.put_cf(cf_handles_1, "e", "f").unwrap();
-        db.put_cf(cf_handles_1, "x", "y").unwrap();
+        let cf_handle = db.cf_handle("1").unwrap();
+        db.put_cf(cf_handle, "a", "b").unwrap();
+        db.put_cf(cf_handle, "e", "f").unwrap();
+        db.put_cf(cf_handle, "x", "y").unwrap();
 
-        let items_map: HashMap<&str, Option<String>> = db.last_kv_pair_in_cfs(&cfs);
-        assert!(items_map.get("1").unwrap().as_ref().unwrap().eq("y"));
+        let (_, value) = db.last_kv_in_cf("1").unwrap();
+        let deserialized: String = utils::deserialize_from_bytes(value.to_vec())
+            .unwrap()
+            .unwrap();
+        assert_eq!("y".to_string(), deserialized);
 
         drop(db);
         DB::destroy(&Options::default(), "test").unwrap();
     }
 
     #[test]
+    fn test_batch_put_cf() {
+        let cfs = [String::from("1")];
+        let db = Database::open_with_cfs("test", &cfs);
+        db.batch_put_cf("1", vec![("1", "a"), ("2", "b"), ("3", "c")])
+            .unwrap();
+    }
+
+    #[test]
     fn test_iter_cf_since_key() {
         let cfs = [String::from("1")];
         let db = Database::open_with_cfs("test", &cfs);
-        let cf_handles = db.get_cf_handles(&cfs);
 
-        let cf_handles_1 = cf_handles.get("1").unwrap().unwrap();
-        db.put_cf(cf_handles_1, "a", "b").unwrap();
-        db.put_cf(cf_handles_1, "e", "f").unwrap();
-        db.put_cf(cf_handles_1, "x", "y").unwrap();
+        let cf_handles = db.cf_handle("1").unwrap();
+        db.put_cf(cf_handles, "a", "b").unwrap();
+        db.put_cf(cf_handles, "e", "f").unwrap();
+        db.put_cf(cf_handles, "x", "y").unwrap();
 
-        let iter = db.iter_cf_since(cf_handles_1, Some("e".as_bytes()));
+        let iter = db.iter_cf_since(cf_handles, Some("e".as_bytes()));
         for (key, value) in iter {
             println!(
                 "key: {}, value: {}",
@@ -205,14 +223,13 @@ mod tests {
     fn test_iter_cf_since_none() {
         let cfs = [String::from("1")];
         let db = Database::open_with_cfs("test", &cfs);
-        let cf_handles = db.get_cf_handles(&cfs);
 
-        let cf_handles_1 = cf_handles.get("1").unwrap().unwrap();
-        db.put_cf(cf_handles_1, "a", "b").unwrap();
-        db.put_cf(cf_handles_1, "e", "f").unwrap();
-        db.put_cf(cf_handles_1, "x", "y").unwrap();
+        let cf_handles = db.cf_handle("1").unwrap();
+        db.put_cf(cf_handles, "a", "b").unwrap();
+        db.put_cf(cf_handles, "e", "f").unwrap();
+        db.put_cf(cf_handles, "x", "y").unwrap();
 
-        let iter = db.iter_cf_since(cf_handles_1, None);
+        let iter = db.iter_cf_since(cf_handles, None);
         for (key, value) in iter {
             println!(
                 "key: {}, value: {}",

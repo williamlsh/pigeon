@@ -1,5 +1,5 @@
-use crate::client::ReusableBlockingClient;
 use log::warn;
+use reqwest::blocking::Client;
 use serde::Deserialize;
 use url::Url;
 
@@ -25,11 +25,14 @@ impl User {
     // No unit test for this function.
     /// get_user_ids returns user_ids corresponding to the orders of usernames.
     pub fn get_user_ids(
-        client: &ReusableBlockingClient,
+        client: &Client,
         endpoint: Url,
+        auth_token: &str,
     ) -> Result<Option<Vec<String>>, String> {
         let response = client
-            .get(&endpoint)
+            .get(endpoint)
+            .bearer_auth(auth_token)
+            .send()
             .map_err(|error| format!("get request failed: {:?}", error))?;
         if !response.status().is_success() {
             warn!(
