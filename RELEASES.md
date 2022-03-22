@@ -1,6 +1,14 @@
 Version 0.0.2 (2022-03-19)
 ==========================
 
+Features:
+
+- Sync Timeline tweets in RocksDB with Telegram channel.
+- Export Timeline raw data in RocksDB.
+
+Version 0.0.2 (2022-03-19)
+==========================
+
 Fixes:
 
 - Use timestamp as database key to avoid keys duplication.
