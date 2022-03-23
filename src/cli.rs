@@ -15,7 +15,7 @@ pub enum Commands {
     Archive(Archive),
     /// Sync tweets extracted from RocksDB raw timeline data to Telegram channel.
     Sync(Sync),
-    /// Export all raw data in RocksDB.
+    /// Export all raw data from RocksDB.
     Export(Export),
 }
 

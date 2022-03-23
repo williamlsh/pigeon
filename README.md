@@ -5,7 +5,7 @@ Tweets in sync with Telegram channel.
 ## Features
 
 - Archive Twitter users' timeline.
-- Store and export timeline data in RocksDB.
+- Store and export timeline data in and from RocksDB.
 - Sync timeline tweets with Telegram channel.
 
 ## How to use
@@ -26,7 +26,7 @@ OPTIONS:
 
 SUBCOMMANDS:
     archive    Archive users' Twitter timeline raw data to RocksDB
-    export     Export all raw data in RocksDB
+    export     Export all raw data from RocksDB
     help       Print this message or the help of the given subcommand(s)
     sync       Sync tweets extracted from RocksDB raw timeline data to Telegram channel
 ```
