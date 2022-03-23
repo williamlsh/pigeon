@@ -1,3 +1,14 @@
+Version 0.1.2 (2022-03-23)
+==========================
+
+Fixes:
+
+- Fix sync position mark (#4).
+
+Features:
+
+- add minimum request interval to pass Telegram api rate limit.
+
 Version 0.1.1 (2022-03-23)
 ==========================
 
