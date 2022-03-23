@@ -1,5 +1,8 @@
 set dotenv-load
 
+DOCKER_IMAGE := "ghcr.io/williamlsh/pigeon"
+IMAGE_TAG := "latest"
+
 test:
     @cargo test --all-targets -- --test-threads=1
 
@@ -24,3 +27,12 @@ sync:
 
 delete-database:
     @rm -rf $ROCKSDB_PATH
+
+build:
+    @cargo build -r
+
+image:
+    @sudo docker build -t {{DOCKER_IMAGE}}:{{IMAGE_TAG}} .
+
+push:
+    @sudo docker push {{DOCKER_IMAGE}}:{{IMAGE_TAG}}

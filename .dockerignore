@@ -1,0 +1,5 @@
+/.github
+/fixture
+/rocksdb
+/target
+.env
