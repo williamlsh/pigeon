@@ -7,6 +7,7 @@ use crate::{
 };
 use log::{debug, info, warn};
 use reqwest::{blocking::Client, StatusCode};
+use std::{thread, time::Duration};
 
 pub fn sync(args: Sync) {
     let client = Client::new();
@@ -107,6 +108,8 @@ pub fn sync(args: Sync) {
                         if last_timeline_index.is_some() {
                             db.0.delete_cf(cf_handle_sync_cursor, &key).unwrap();
                         }
+
+                        thread::sleep(Duration::from_secs(3));
                     }
                     other => {
                         warn!(
