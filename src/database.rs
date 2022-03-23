@@ -111,8 +111,8 @@ impl Database {
         match key {
             Some(key) => self
                 .0
-                .iterator_cf(cf_handle, IteratorMode::From(key, Direction::Forward)),
-            None => self.0.iterator_cf(cf_handle, IteratorMode::Start),
+                .iterator_cf(cf_handle, IteratorMode::From(key, Direction::Reverse)),
+            None => self.0.iterator_cf(cf_handle, IteratorMode::End),
         }
     }
 }
