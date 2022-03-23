@@ -1,4 +1,4 @@
-use crate::{cli::Export, twitter::timeline::Timeline, utils};
+use crate::{cli::Export, database, twitter::timeline::Timeline, utils};
 use log::info;
 use rocksdb::{IteratorMode, Options, DB};
 
@@ -9,6 +9,9 @@ pub fn export(args: Export) {
 
     let db = DB::open_cf_for_read_only(&opts, &args.rocksdb_path, &cfs, false).unwrap();
     for cf in cfs {
+        if cf.eq(database::COLUMN_FAMILY_SYNC_CURSOR) {
+            continue;
+        }
         info!("Exporting data in {}", cf);
 
         let cf_handle = db.cf_handle(&cf).unwrap();
