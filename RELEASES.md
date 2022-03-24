@@ -1,3 +1,11 @@
+Version 0.1.3 (2022-03-23)
+==========================
+
+Fixes:
+
+- Fix skip exporting none-timeline data.
+- Fix including existing RocksDB column families to open.
+
 Version 0.1.2 (2022-03-23)
 ==========================
 
