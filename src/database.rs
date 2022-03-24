@@ -115,6 +115,11 @@ impl Database {
             None => self.0.iterator_cf(cf_handle, IteratorMode::End),
         }
     }
+
+    pub fn list_cf<P: AsRef<Path>>(path: P) -> Result<Vec<String>, String> {
+        DB::list_cf(&Options::default(), path)
+            .map_err(|error| format!("could not list all column families: {:?}", error))
+    }
 }
 
 #[cfg(test)]

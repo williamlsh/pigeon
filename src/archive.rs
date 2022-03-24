@@ -1,6 +1,6 @@
 use crate::{
     cli::Archive,
-    database::{Database, COLUMN_FAMILY_SYNC_CURSOR},
+    database::Database,
     twitter::{
         timeline::{PaginatedTimeline, Timeline, UrlBuilder},
         user::User,
@@ -48,7 +48,8 @@ pub fn archive(args: Archive) {
         .iter()
         .map(Database::cf_timeline_from_username)
         .collect();
-    cfs.push(COLUMN_FAMILY_SYNC_CURSOR.to_string());
+    let mut cfs_existed = Database::list_cf(&args.rocksdb_path).unwrap();
+    cfs.append(&mut cfs_existed);
     let db = Database::open_with_cfs(&args.rocksdb_path, &cfs);
 
     'loop_username_id_pairs: for (username, user_id) in username_id_pairs {

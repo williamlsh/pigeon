@@ -15,10 +15,7 @@ pub fn sync(args: Sync) {
         telegram::url_from_method(&args.telegram_bot_api_token, "sendMessage").unwrap();
 
     let usernames: Vec<&str> = args.twitter_usernames.split(',').collect();
-    let mut cfs: Vec<String> = usernames
-        .iter()
-        .map(Database::cf_timeline_from_username)
-        .collect();
+    let mut cfs: Vec<String> = Database::list_cf(&args.rocksdb_path).unwrap();
     // A column family to record last position to sync in database.
     cfs.push(database::COLUMN_FAMILY_SYNC_CURSOR.to_string());
     let db = Database::open_with_cfs(&args.rocksdb_path, &cfs);
