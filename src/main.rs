@@ -3,6 +3,7 @@ use pigeon::{
     archive::archive,
     cli::{Cli, Commands},
     export::export,
+    poll::poll,
     sync::sync,
 };
 
@@ -14,5 +15,6 @@ fn main() {
         Commands::Archive(args) => archive(args),
         Commands::Sync(args) => sync(args),
         Commands::Export(args) => export(args),
+        Commands::Poll(args) => poll(args),
     }
 }

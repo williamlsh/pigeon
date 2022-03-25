@@ -1,8 +1,8 @@
 use crate::{
     cli::Archive,
-    database::Database,
+    database::{Database, COLUMN_FAMILY_NEWEST_TWEET_ID},
     twitter::{
-        timeline::{PaginatedTimeline, Timeline, UrlBuilder},
+        timeline::{PaginatedTimeline, PaginationToken, Timeline, UrlBuilder},
         user::User,
         API_ENDPOINT_BASE,
     },
@@ -37,22 +37,19 @@ pub fn archive(args: Archive) {
         .unwrap();
 
     let usernames: Vec<&str> = args.twitter_usernames.split(',').collect();
-    let username_id_pairs: Vec<(String, String)> = usernames
-        .iter()
-        .map(|&s| s.to_string())
-        .zip(user_ids)
-        .collect();
+    let username_id_pairs: Vec<(&&str, String)> = usernames.iter().zip(user_ids).collect();
 
     // Column families formed from usernames.
+    let cfs_existed = Database::list_cf(&args.rocksdb_path).unwrap();
     let mut cfs: Vec<String> = usernames
         .iter()
         .map(Database::cf_timeline_from_username)
+        .chain(cfs_existed)
         .collect();
-    let mut cfs_existed = Database::list_cf(&args.rocksdb_path).unwrap();
-    cfs.append(&mut cfs_existed);
+    cfs.push(COLUMN_FAMILY_NEWEST_TWEET_ID.to_string());
     let db = Database::open_with_cfs(&args.rocksdb_path, &cfs);
 
-    'loop_username_id_pairs: for (username, user_id) in username_id_pairs {
+    'loop_username_id_pairs: for (&username, user_id) in username_id_pairs {
         info!("Starting to archive timeline for user: {}", username);
 
         // We just need default fields in returning object.
@@ -63,25 +60,15 @@ pub fn archive(args: Archive) {
 
         // Get column family name.
         let cf = Database::cf_timeline_from_username(&username);
-        // Get column family handle corresponds to this user id.
-        let cf_handle = db.cf_handle(&cf).unwrap();
-        // Continue from last pagination token.
-        let pagination_token = match db.last_kv_in_cf(&cf) {
-            Some((_, value)) => {
-                utils::deserialize_from_bytes::<Timeline>(value.to_vec())
-                    .unwrap()
-                    .unwrap()
-                    .meta
-                    .next_token
-            }
-            None => None,
-        };
-        if pagination_token.is_some() {
-            info!(
-                "Previous pages found in database, last pagination token: {}",
-                pagination_token.as_ref().unwrap()
-            );
-        }
+        // Continue from next pagination token.
+        let pagination_token = db.last_kv_in_cf(&cf).and_then(|(_, value)| {
+            utils::deserialize_from_bytes::<Timeline>(value.to_vec())
+                .unwrap()
+                .unwrap()
+                .meta
+                .next_token
+                .map(PaginationToken::NextToken)
+        });
 
         let paginated_timeline = PaginatedTimeline::new(
             &client,
@@ -100,7 +87,19 @@ pub fn archive(args: Archive) {
             }
 
             let key = utils::timestamp();
-            db.put_cf(cf_handle, &key.to_string(), &timeline).unwrap();
+            db.put_cf(&cf, key.to_string(), &timeline).unwrap();
         }
+
+        // Record newest tweet id of this user.
+        let (_, value) = db.first_kv_in_cf(&cf).unwrap();
+        let newest_id = utils::deserialize_from_bytes::<Timeline>(value.to_vec())
+            .unwrap()
+            .unwrap()
+            .meta
+            .newest_id;
+        debug!("newest tweet id: {}", newest_id);
+
+        db.put_cf(COLUMN_FAMILY_NEWEST_TWEET_ID, &username, &newest_id)
+            .unwrap();
     }
 }

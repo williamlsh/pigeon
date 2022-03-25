@@ -25,6 +25,15 @@ sync:
         --channel-usernames $CHANNEL_USERNAMES \
         --rocksdb-path $ROCKSDB_PATH
 
+poll:
+    @RUST_BACKTRACE=1 RUST_LOG=debug cargo run -r -- \
+        poll \
+        --telegram-bot-api-token $TELEGRAM_BOT_API_TOKEN \
+        --twitter-api-token $TWITTER_API_TOKEN \
+        --twitter-usernames $TWITTER_USERNAMES \
+        --channel-usernames $CHANNEL_USERNAMES \
+        --rocksdb-path $ROCKSDB_PATH
+
 delete-database:
     @rm -rf $ROCKSDB_PATH
 

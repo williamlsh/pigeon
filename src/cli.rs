@@ -17,6 +17,8 @@ pub enum Commands {
     Sync(Sync),
     /// Export all raw data from RocksDB.
     Export(Export),
+    /// Poll Timeline since latest archived tweet.
+    Poll(Poll),
 }
 
 #[derive(Debug, Args)]
@@ -55,4 +57,25 @@ pub struct Export {
     /// Path to RocksDB.
     #[clap(long)]
     pub rocksdb_path: PathBuf,
+}
+
+#[derive(Debug, Args)]
+pub struct Poll {
+    /// Twitter api auth token.
+    #[clap(long)]
+    pub twitter_api_token: String,
+    /// Telegram bot api auth token.
+    #[clap(long)]
+    pub telegram_bot_api_token: String,
+    /// Path to RocksDB.
+    #[clap(long)]
+    pub rocksdb_path: PathBuf,
+    /// Twitter usernames, it's a comma separated string.
+    #[clap(long)]
+    pub twitter_usernames: String,
+    /// Telegram channel usernames, it's a comma separated string.
+    /// The channel username's order corresponds to that in the value of `twitter_usernames`, that is to say,
+    /// one Twitter user to one Telegram channel.
+    #[clap(long)]
+    pub channel_usernames: String,
 }
