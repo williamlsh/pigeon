@@ -35,13 +35,19 @@ impl UrlBuilder {
     }
 }
 
+#[derive(Debug)]
+pub enum PaginationToken {
+    NextToken(String),
+    TweetID(String),
+}
+
 /// A PaginatedTimeline only supports one twitter user's timeline.
 #[derive(Debug)]
 pub struct PaginatedTimeline<'a> {
     client: &'a Client,
     url: Url,
     auth_token: &'a str,
-    pagination_token: Option<String>,
+    pagination_token: Option<PaginationToken>,
     page: usize,
 }
 
@@ -50,7 +56,7 @@ impl<'a> PaginatedTimeline<'a> {
         client: &'a Client,
         url: Url,
         auth_token: &'a str,
-        pagination_token: Option<String>,
+        pagination_token: Option<PaginationToken>,
     ) -> Self {
         Self {
             client,
@@ -64,7 +70,7 @@ impl<'a> PaginatedTimeline<'a> {
     fn try_next(&mut self) -> Result<Option<Timeline>, String> {
         // Check if pagination token is present.
         let url = match self.pagination_token.take() {
-            Some(pagination_token) => self.pagination_token(&pagination_token),
+            Some(pagination_token) => self.url_with_pagination(pagination_token),
             None => match self.page {
                 // The first request.
                 0 => self.url.clone(),
@@ -91,7 +97,11 @@ impl<'a> PaginatedTimeline<'a> {
                 trace!("got timeline: {:?}", timeline);
 
                 // Keep the pagination token for next request.
-                self.pagination_token = timeline.meta.next_token.clone();
+                self.pagination_token = timeline
+                    .meta
+                    .next_token
+                    .clone()
+                    .map(PaginationToken::NextToken);
 
                 // Increase page number on request success.
                 self.page += 1;
@@ -118,10 +128,16 @@ impl<'a> PaginatedTimeline<'a> {
     // No unit test for this function.
     /// Since Url.append_pair will append duplicated key value pairs,
     /// so we don't mutate original Url, we return a clone one.
-    fn pagination_token(&self, pagination_token: &str) -> Url {
+    fn url_with_pagination(&self, pagination_token: PaginationToken) -> Url {
         let mut url = self.url.clone();
-        url.query_pairs_mut()
-            .append_pair("pagination_token", pagination_token);
+        match pagination_token {
+            PaginationToken::NextToken(next_token) => url
+                .query_pairs_mut()
+                .append_pair("pagination_token", &next_token),
+            PaginationToken::TweetID(tweet_id) => {
+                url.query_pairs_mut().append_pair("since_id", &tweet_id)
+            }
+        };
         url
     }
 }
@@ -159,7 +175,7 @@ pub struct Data {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Meta {
     oldest_id: String,
-    newest_id: String,
+    pub newest_id: String,
     result_count: u8,
     pub next_token: Option<String>,
 }

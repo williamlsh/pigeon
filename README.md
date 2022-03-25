@@ -15,7 +15,7 @@ General commands with options:
 ```
 $ cargo run -- --help
 
-pigeon 0.1.0
+pigeon 0.1.4
 
 USAGE:
     pigeon <SUBCOMMAND>
@@ -28,6 +28,7 @@ SUBCOMMANDS:
     archive    Archive users' Twitter timeline raw data to RocksDB
     export     Export all raw data from RocksDB
     help       Print this message or the help of the given subcommand(s)
+    poll       Poll Timeline since latest archived tweet
     sync       Sync tweets extracted from RocksDB raw timeline data to Telegram channel
 ```
 

@@ -1,6 +1,6 @@
 use crate::{
     cli::Sync,
-    database::{self, Database},
+    database::{Database, COLUMN_FAMILY_SYNC_CURSOR},
     telegram,
     twitter::timeline::Timeline,
     utils,
@@ -17,45 +17,42 @@ pub fn sync(args: Sync) {
     let usernames: Vec<&str> = args.twitter_usernames.split(',').collect();
     let mut cfs: Vec<String> = Database::list_cf(&args.rocksdb_path).unwrap();
     // A column family to record last position to sync in database.
-    cfs.push(database::COLUMN_FAMILY_SYNC_CURSOR.to_string());
+    cfs.push(COLUMN_FAMILY_SYNC_CURSOR.to_string());
     let db = Database::open_with_cfs(&args.rocksdb_path, &cfs);
 
-    let cf_handle_sync_cursor = db.cf_handle(database::COLUMN_FAMILY_SYNC_CURSOR).unwrap();
-
     // A slice of tuples containing Twitter username and Telegram channel username.
-    let pairs: Vec<(&str, &str)> = usernames
+    let pairs: Vec<(&&str, &str)> = usernames
         .iter()
-        .copied()
         .zip(args.channel_usernames.split(','))
         .collect();
     // Loop all Twitter users.
-    for (twitter_username, channel_username) in pairs {
+    for (&twitter_username, channel_username) in pairs {
         info!(
             "Sync {}'s tweets to Telegram channel {}.",
             twitter_username, channel_username
         );
 
         // Get the position stopped at last time sync.
-        let last_timeline =
-            db.0.get_cf(cf_handle_sync_cursor, twitter_username)
-                .unwrap();
-
-        let cf_handle = db
-            .cf_handle(Database::cf_timeline_from_username(twitter_username).as_str())
+        let last_timeline = db
+            .get_cf_bytes(COLUMN_FAMILY_SYNC_CURSOR, twitter_username)
             .unwrap();
+
         // Loop all timeline.
         for (i, (key, value)) in db
-            .iter_cf_since(cf_handle, last_timeline.as_deref())
+            .iter_cf_since(
+                &Database::cf_timeline_from_username(twitter_username),
+                last_timeline.as_deref(),
+            )
+            .unwrap()
             .enumerate()
         {
             // Get the position stopped at last time sync.
             // It must be initiated here in order to be updated on every loop
             // to make sure the following loop skipping check reads the new value
             // for every timeline.
-            let last_timeline_index = match last_timeline.as_deref() {
-                Some(key) => db.0.get_cf(cf_handle_sync_cursor, key).unwrap(),
-                None => None,
-            };
+            let last_timeline_index = last_timeline
+                .as_deref()
+                .and_then(|key| db.get_cf_bytes(COLUMN_FAMILY_SYNC_CURSOR, key).unwrap());
 
             let timeline: Timeline = utils::deserialize_from_bytes(value.to_vec())
                 .unwrap()
@@ -99,11 +96,11 @@ pub fn sync(args: Sync) {
                         // So the next timeline iteration (not tweets iteration inside timeline) won't be based on old position
                         // which is supposed to be starting at 0.
                         if last_timeline.is_some() {
-                            db.0.delete_cf(cf_handle_sync_cursor, twitter_username)
+                            db.delete_cf(COLUMN_FAMILY_SYNC_CURSOR, twitter_username)
                                 .unwrap();
                         }
                         if last_timeline_index.is_some() {
-                            db.0.delete_cf(cf_handle_sync_cursor, &key).unwrap();
+                            db.delete_cf(COLUMN_FAMILY_SYNC_CURSOR, &key).unwrap();
                         }
 
                         thread::sleep(Duration::from_secs(3));
@@ -117,16 +114,16 @@ pub fn sync(args: Sync) {
 
                         info!("Save current position in database, index: {}", ii);
                         // Mark sync position, Twitter user -> timeline -> timeline index.
-                        db.0.put_cf(cf_handle_sync_cursor, twitter_username, &key)
+                        db.put_cf(COLUMN_FAMILY_SYNC_CURSOR, twitter_username, &key)
                             .unwrap();
-                        db.0.put_cf(cf_handle_sync_cursor, &key, ii.to_string())
+                        db.put_cf(COLUMN_FAMILY_SYNC_CURSOR, &key, &ii.to_string())
                             .unwrap();
 
                         return;
                     }
                 }
             }
-            info!("Syncing finished for this timeline.")
+            info!("Syncing finished for this timeline.");
         }
         info!(
             "Syncing finished for Twitter user {} to Telegram channel {}",
@@ -137,9 +134,9 @@ pub fn sync(args: Sync) {
         let (key, _) = db
             .last_kv_in_cf(&Database::cf_timeline_from_username(twitter_username))
             .unwrap();
-        db.0.put_cf(cf_handle_sync_cursor, twitter_username, &key)
+        db.put_cf(COLUMN_FAMILY_SYNC_CURSOR, twitter_username, &key)
             .unwrap();
-        db.0.put_cf(cf_handle_sync_cursor, key, 100.to_string())
+        db.put_cf(COLUMN_FAMILY_SYNC_CURSOR, key, &100.to_string())
             .unwrap();
     }
 }
