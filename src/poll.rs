@@ -45,13 +45,16 @@ pub fn poll(args: Poll) {
 
     let twitter_username_id_pairs: Vec<(&&str, String)> =
         twitter_usernames.iter().zip(twitter_user_ids).collect();
-    for (&twitter_username, twitter_user_id) in twitter_username_id_pairs {
+    'loop_user: for (&twitter_username, twitter_user_id) in twitter_username_id_pairs {
         info!("Starting to poll timeline for user: {}", twitter_username);
 
-        let newest_tweet_id: String = db
-            .get_cf(COLUMN_FAMILY_NEWEST_TWEET_ID, twitter_username)
-            .unwrap()
-            .unwrap();
+        let newest_tweet_id = String::from_utf8(
+            db.get_cf_bytes(COLUMN_FAMILY_NEWEST_TWEET_ID, twitter_username)
+                .unwrap()
+                .unwrap(),
+        )
+        .unwrap();
+        debug!("newest tweet id: {}", newest_tweet_id);
 
         // We just need default fields in returning object.
         let timeline_endpoint = timeline::UrlBuilder::new(&twitter_api_base_url, &twitter_user_id)
@@ -66,7 +69,7 @@ pub fn poll(args: Poll) {
             &client,
             timeline_endpoint,
             &args.twitter_api_token,
-            Some(PaginationToken::TweetID(newest_tweet_id)),
+            Some(PaginationToken::TweetID(newest_tweet_id.clone())),
         );
 
         for (i, timeline) in paginated_timeline.enumerate() {
@@ -74,6 +77,17 @@ pub fn poll(args: Poll) {
 
             let key = utils::timestamp();
             db.put_cf(&cf, key.to_string(), &timeline).unwrap();
+
+            if timeline
+                .data
+                .as_deref()
+                .unwrap()
+                .iter()
+                .any(|tweet| tweet.id.eq(&newest_tweet_id))
+            {
+                info!("Timeline hits newest tweet id, stop");
+                continue 'loop_user;
+            }
         }
     }
 
@@ -86,6 +100,16 @@ pub fn poll(args: Poll) {
             "Sync {}'s tweets to Telegram channel {}.",
             twitter_username, channel_username
         );
+
+        let newest_tweet_id = String::from_utf8(
+            db.get_cf_bytes(COLUMN_FAMILY_NEWEST_TWEET_ID, twitter_username)
+                .unwrap()
+                .unwrap(),
+        )
+        .unwrap();
+        debug!("newest tweet id: {}", newest_tweet_id);
+        let mut hit_newest_tweet_id = false;
+
         let cf = Database::cf_poll_from_username(twitter_username, timestamp);
         for (i, (_, value)) in db.iter_cf_since(&cf, None).unwrap().enumerate() {
             let timeline: Timeline = utils::deserialize_from_bytes(value.to_vec())
@@ -93,6 +117,14 @@ pub fn poll(args: Poll) {
                 .unwrap();
 
             for (ii, data) in timeline.data.unwrap().iter().rev().enumerate() {
+                if !hit_newest_tweet_id {
+                    if data.id.eq(&newest_tweet_id) {
+                        debug!("Hit newest tweet id");
+                        hit_newest_tweet_id = true;
+                    }
+                    continue;
+                }
+
                 info!(
                     "Current syncing tweet {} at current page {} of Twitter user {}, ",
                     ii, i, twitter_username
@@ -128,8 +160,13 @@ pub fn poll(args: Poll) {
             channel_username, twitter_username
         );
 
-        let (_, value) = db.first_kv_in_cf(&cf).unwrap();
-        db.put_cf(COLUMN_FAMILY_NEWEST_TWEET_ID, twitter_username, &value)
+        let (_, value) = db.first_kv_in_cf(&cf).expect("No new timeline to poll");
+        let newest_id = utils::deserialize_from_bytes::<Timeline>(value.to_vec())
+            .unwrap()
+            .unwrap()
+            .meta
+            .newest_id;
+        db.put_cf_bytes(COLUMN_FAMILY_NEWEST_TWEET_ID, twitter_username, newest_id)
             .unwrap();
     }
 }

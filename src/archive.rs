@@ -99,7 +99,7 @@ pub fn archive(args: Archive) {
             .newest_id;
         debug!("newest tweet id: {}", newest_id);
 
-        db.put_cf(COLUMN_FAMILY_NEWEST_TWEET_ID, &username, &newest_id)
+        db.put_cf_bytes(COLUMN_FAMILY_NEWEST_TWEET_ID, &username, newest_id)
             .unwrap();
     }
 }

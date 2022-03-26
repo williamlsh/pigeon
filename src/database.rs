@@ -1,9 +1,10 @@
-use crate::utils;
 use rocksdb::{
     ColumnFamilyDescriptor, DBIterator, Direction, IteratorMode, Options, WriteBatch, DB,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Display, path::Path};
+
+use crate::utils;
 
 const COLUMN_FAMILY_TIMELINE_PREFIX: &str = "timeline";
 const COLUMN_FAMILY_POLL_PREFIX: &str = "poll";
@@ -43,6 +44,20 @@ impl Database {
                     .map_err(|error| format!("could not put data into rocksdb: {:?}", error)),
                 Err(error) => Err(format!("could not serialize to string: {:?}", error)),
             },
+            None => Err(format!("no such column family: {}", cf)),
+        }
+    }
+
+    pub fn put_cf_bytes<K, V>(&self, cf: &str, key: K, value: V) -> Result<(), String>
+    where
+        K: AsRef<[u8]>,
+        V: AsRef<[u8]>,
+    {
+        match self.0.cf_handle(cf) {
+            Some(cf_handle) => self
+                .0
+                .put_cf(cf_handle, key, value)
+                .map_err(|error| format!("could not put data into rocksdb: {:?}", error)),
             None => Err(format!("no such column family: {}", cf)),
         }
     }

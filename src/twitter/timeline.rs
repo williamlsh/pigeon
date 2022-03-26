@@ -167,7 +167,7 @@ pub struct Timeline {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Data {
-    id: String,
+    pub id: String,
     pub created_at: String,
     pub text: String,
 }
