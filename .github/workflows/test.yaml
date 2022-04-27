@@ -1,0 +1,39 @@
+on: [push, pull_request]
+
+name: Test and Build
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        rust-toolchain: [stable]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: extractions/setup-just@v1
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust-toolchain }}
+          components: rustfmt,clippy
+          override: true
+      - name: Cache build artifacts
+        id: cache-cargo
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ matrix.rust-toolchain }}
+      - name: Check code style
+        run: cargo fmt --check
+      - name: Lint code
+        run: cargo clippy
+      - name: Test code
+        run: just test
+      - name: Build code
+        run: just build
