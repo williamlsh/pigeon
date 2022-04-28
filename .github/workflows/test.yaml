@@ -32,10 +32,17 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Check code style
-        run: cargo fmt --check
+        run: cargo fmt --all -- --check
       - name: Lint code
-        run: cargo clippy
+        uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-features -- -W clippy::all
       - name: Test code
         run: just test
       - name: Build code
         run: just build
+      - name: Audit code
+        uses: actions-rs/audit-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
