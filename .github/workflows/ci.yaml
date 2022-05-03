@@ -24,6 +24,8 @@ jobs:
         uses: Swatinem/rust-cache@v1
       - name: Check code style
         run: cargo fmt --all -- --check
+      - name: Build code
+        run: just build
       - name: Lint code
         uses: actions-rs/clippy-check@v1
         with:
@@ -31,9 +33,7 @@ jobs:
           args: --all-features -- -W clippy::all
       - name: Test code
         run: just test
-      - name: Build code
-        run: just build
-      - name: Audit code
-        uses: actions-rs/audit-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Audit code
+      #   uses: actions-rs/audit-check@v1
+      #   with:
+      #     token: ${{ secrets.GITHUB_TOKEN }}
