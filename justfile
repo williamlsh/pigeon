@@ -4,7 +4,7 @@ DOCKER_IMAGE := "ghcr.io/williamlsh/pigeon"
 IMAGE_TAG := "latest"
 
 test:
-    @cargo test --all-targets -- --test-threads=1
+    @cargo nextest run --all-targets --test-threads=1
 
 archive:
     @RUST_BACKTRACE=1 RUST_LOG=debug cargo run -r -- \
