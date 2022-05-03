@@ -20,6 +20,7 @@ jobs:
           toolchain: ${{ matrix.rust-toolchain }}
           components: rustfmt,clippy
           override: true
+      - uses: rui314/setup-mold@v1
       - name: Cache build artifacts
         uses: Swatinem/rust-cache@v1
       - name: Install cargo-nextest
@@ -29,7 +30,9 @@ jobs:
       - name: Check code style
         run: cargo fmt --all -- --check
       - name: Build code
-        run: just build
+        run: |
+          just build
+          readelf -p .comment target/release/pigeon
       - name: Lint code
         uses: actions-rs/clippy-check@v1
         with:
