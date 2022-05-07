@@ -160,6 +160,10 @@ pub fn poll(args: Poll) {
             channel_username, twitter_username
         );
 
+        if !hit_newest_tweet_id {
+            continue;
+        }
+
         let (_, value) = db.first_kv_in_cf(&cf).expect("No new timeline to poll");
         let newest_id = utils::deserialize_from_bytes::<Timeline>(value.to_vec())
             .unwrap()
