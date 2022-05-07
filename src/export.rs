@@ -1,11 +1,10 @@
 use crate::{cli::Export, database, twitter::timeline::Timeline, utils};
-use log::info;
 use rocksdb::{IteratorMode, Options, DB};
 
 pub fn export(args: Export) {
     let opts = Options::default();
     let cfs = DB::list_cf(&opts, &args.rocksdb_path).unwrap();
-    info!("All column families: {:?}", &cfs);
+    println!("All column families: {:?}", &cfs);
 
     let db = DB::open_cf_for_read_only(&opts, &args.rocksdb_path, &cfs, false).unwrap();
     for cf in cfs {
@@ -14,7 +13,7 @@ pub fn export(args: Export) {
         {
             continue;
         }
-        info!("Exporting data in {}", cf);
+        println!("Exporting data in {}", cf);
 
         let cf_handle = db.cf_handle(&cf).unwrap();
         let iter = db.iterator_cf(cf_handle, IteratorMode::Start);
@@ -24,6 +23,6 @@ pub fn export(args: Export) {
                 .unwrap();
             println!("{:?}", timeline);
         });
-        info!("Finished exporting data in {}", cf);
+        println!("Finished exporting data in {}", cf);
     }
 }
