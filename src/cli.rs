@@ -24,58 +24,58 @@ pub enum Commands {
 #[derive(Debug, Args)]
 pub struct Archive {
     /// Twitter api auth token.
-    #[clap(long)]
+    #[clap(long, value_parser)]
     pub twitter_api_token: String,
     /// Path to RocksDB.
-    #[clap(long)]
+    #[clap(long, value_parser)]
     pub rocksdb_path: PathBuf,
     /// Twitter usernames, it's a comma separated string.
-    #[clap(long)]
+    #[clap(long, value_parser)]
     pub twitter_usernames: String,
 }
 
 #[derive(Debug, Args)]
 pub struct Sync {
     /// Telegram bot api auth token.
-    #[clap(long)]
+    #[clap(long, value_parser)]
     pub telegram_bot_api_token: String,
     /// Path to RocksDB.
-    #[clap(long)]
+    #[clap(long, value_parser)]
     pub rocksdb_path: PathBuf,
     /// Twitter usernames, it's a comma separated string.
-    #[clap(long)]
+    #[clap(long, value_parser)]
     pub twitter_usernames: String,
     /// Telegram channel usernames, it's a comma separated string.
     /// The channel username's order corresponds to that in the value of `twitter_usernames`, that is to say,
     /// one Twitter user to one Telegram channel.
-    #[clap(long)]
+    #[clap(long, value_parser)]
     pub channel_usernames: String,
 }
 
 #[derive(Debug, Args)]
 pub struct Export {
     /// Path to RocksDB.
-    #[clap(long)]
+    #[clap(long, value_parser)]
     pub rocksdb_path: PathBuf,
 }
 
 #[derive(Debug, Args)]
 pub struct Poll {
     /// Twitter api auth token.
-    #[clap(long)]
+    #[clap(long, value_parser)]
     pub twitter_api_token: String,
     /// Telegram bot api auth token.
-    #[clap(long)]
+    #[clap(long, value_parser)]
     pub telegram_bot_api_token: String,
     /// Path to RocksDB.
-    #[clap(long)]
+    #[clap(long, value_parser)]
     pub rocksdb_path: PathBuf,
     /// Twitter usernames, it's a comma separated string.
-    #[clap(long)]
+    #[clap(long, value_parser)]
     pub twitter_usernames: String,
     /// Telegram channel usernames, it's a comma separated string.
     /// The channel username's order corresponds to that in the value of `twitter_usernames`, that is to say,
     /// one Twitter user to one Telegram channel.
-    #[clap(long)]
+    #[clap(long, value_parser)]
     pub channel_usernames: String,
 }
