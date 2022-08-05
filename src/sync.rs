@@ -127,7 +127,7 @@ pub fn sync(args: Sync) {
         }
         info!(
             "Syncing finished for Twitter user {} to Telegram channel {}",
-            channel_username, twitter_username
+            twitter_username, channel_username
         );
 
         // Once sync successfully for a Twitter user, update the last position.

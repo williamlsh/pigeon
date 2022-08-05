@@ -157,7 +157,7 @@ pub fn poll(args: Poll) {
         }
         info!(
             "Syncing finished for Twitter user {} to Telegram channel {}",
-            channel_username, twitter_username
+            twitter_username, channel_username
         );
 
         if !hit_newest_tweet_id {
