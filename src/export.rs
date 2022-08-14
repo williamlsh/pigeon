@@ -17,11 +17,13 @@ pub fn export(args: Export) {
 
         let cf_handle = db.cf_handle(&cf).unwrap();
         let iter = db.iterator_cf(cf_handle, IteratorMode::Start);
-        iter.for_each(|(_, value)| {
-            let timeline: Timeline = utils::deserialize_from_bytes(value.to_vec())
-                .unwrap()
-                .unwrap();
-            println!("{:?}", timeline);
+        iter.for_each(|item| {
+            if let Ok((_, value)) = item {
+                let timeline: Timeline = utils::deserialize_from_bytes(value.to_vec())
+                    .unwrap()
+                    .unwrap();
+                println!("{:?}", timeline);
+            }
         });
         println!("Finished exporting data in {}", cf);
     }

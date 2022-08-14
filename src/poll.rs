@@ -111,7 +111,8 @@ pub fn poll(args: Poll) {
         let mut hit_newest_tweet_id = false;
 
         let cf = Database::cf_poll_from_username(twitter_username, timestamp);
-        for (i, (_, value)) in db.iter_cf_since(&cf, None).unwrap().enumerate() {
+        for (i, item) in db.iter_cf_since(&cf, None).unwrap().enumerate() {
+            let (_, value) = item.unwrap();
             let timeline: Timeline = utils::deserialize_from_bytes(value.to_vec())
                 .unwrap()
                 .unwrap();
@@ -164,7 +165,10 @@ pub fn poll(args: Poll) {
             continue;
         }
 
-        let (_, value) = db.first_kv_in_cf(&cf).expect("No new timeline to poll");
+        let (_, value) = db
+            .first_kv_in_cf(&cf)
+            .expect("No new timeline to poll")
+            .unwrap();
         let newest_id = utils::deserialize_from_bytes::<Timeline>(value.to_vec())
             .unwrap()
             .unwrap()

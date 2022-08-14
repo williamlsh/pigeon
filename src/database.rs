@@ -109,13 +109,19 @@ impl Database {
         }
     }
 
-    pub fn last_kv_in_cf(&self, cf: &str) -> Option<(Box<[u8]>, Box<[u8]>)> {
+    pub fn last_kv_in_cf(
+        &self,
+        cf: &str,
+    ) -> Option<Result<(Box<[u8]>, Box<[u8]>), rocksdb::Error>> {
         self.0
             .cf_handle(cf)
             .and_then(|cf_handle| self.0.iterator_cf(cf_handle, IteratorMode::End).next())
     }
 
-    pub fn first_kv_in_cf(&self, cf: &str) -> Option<(Box<[u8]>, Box<[u8]>)> {
+    pub fn first_kv_in_cf(
+        &self,
+        cf: &str,
+    ) -> Option<Result<(Box<[u8]>, Box<[u8]>), rocksdb::Error>> {
         self.0
             .cf_handle(cf)
             .and_then(|cf_handle| self.0.iterator_cf(cf_handle, IteratorMode::Start).next())
@@ -224,7 +230,7 @@ mod tests {
             db.put_cf(cf, "e", "f").unwrap();
             db.put_cf(cf, "x", "y").unwrap();
 
-            let (_, value) = db.last_kv_in_cf(cf).unwrap();
+            let (_, value) = db.last_kv_in_cf(cf).unwrap().unwrap();
             let value: String = utils::deserialize_from_bytes(value.to_vec())
                 .unwrap()
                 .unwrap();
@@ -256,7 +262,7 @@ mod tests {
             db.put_cf(cf, "x", "y").unwrap();
 
             let iter = db.iter_cf_since(cf, Some("e".as_bytes())).unwrap();
-            for (key, value) in iter {
+            for (key, value) in iter.flatten() {
                 println!(
                     "key: {}, value: {}",
                     String::from_utf8(key.to_vec()).unwrap(),
@@ -280,7 +286,7 @@ mod tests {
             db.put_cf(cf, "x", "y").unwrap();
 
             let iter = db.iter_cf_since(cf, None).unwrap();
-            for (key, value) in iter {
+            for (key, value) in iter.flatten() {
                 println!(
                     "key: {}, value: {}",
                     String::from_utf8(key.to_vec()).unwrap(),

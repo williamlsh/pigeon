@@ -61,13 +61,14 @@ pub fn archive(args: Archive) {
         // Get column family name.
         let cf = Database::cf_timeline_from_username(&username);
         // Continue from next pagination token.
-        let pagination_token = db.last_kv_in_cf(&cf).and_then(|(_, value)| {
-            utils::deserialize_from_bytes::<Timeline>(value.to_vec())
+        let pagination_token = db.last_kv_in_cf(&cf).and_then(|item| match item {
+            Ok((_, value)) => utils::deserialize_from_bytes::<Timeline>(value.to_vec())
                 .unwrap()
                 .unwrap()
                 .meta
                 .next_token
-                .map(PaginationToken::NextToken)
+                .map(PaginationToken::NextToken),
+            Err(_) => None,
         });
 
         let paginated_timeline = PaginatedTimeline::new(
@@ -91,7 +92,7 @@ pub fn archive(args: Archive) {
         }
 
         // Record newest tweet id of this user.
-        let (_, value) = db.first_kv_in_cf(&cf).unwrap();
+        let (_, value) = db.first_kv_in_cf(&cf).unwrap().unwrap();
         let newest_id = utils::deserialize_from_bytes::<Timeline>(value.to_vec())
             .unwrap()
             .unwrap()

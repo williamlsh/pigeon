@@ -38,7 +38,7 @@ pub fn sync(args: Sync) {
             .unwrap();
 
         // Loop all timeline.
-        for (i, (key, value)) in db
+        for (i, item) in db
             .iter_cf_since(
                 &Database::cf_timeline_from_username(twitter_username),
                 last_timeline.as_deref(),
@@ -46,6 +46,7 @@ pub fn sync(args: Sync) {
             .unwrap()
             .enumerate()
         {
+            let (key, value) = item.unwrap();
             // Get the position stopped at last time sync.
             // It must be initiated here in order to be updated on every loop
             // to make sure the following loop skipping check reads the new value
@@ -133,6 +134,7 @@ pub fn sync(args: Sync) {
         // Once sync successfully for a Twitter user, update the last position.
         let (key, _) = db
             .last_kv_in_cf(&Database::cf_timeline_from_username(twitter_username))
+            .unwrap()
             .unwrap();
         db.put_cf(COLUMN_FAMILY_SYNC_CURSOR, twitter_username, &key)
             .unwrap();
