@@ -1,38 +1,70 @@
 use log::warn;
-use reqwest::blocking::Client;
+use reqwest::Client;
 use serde::Deserialize;
+use std::collections::HashMap;
 use url::Url;
 
-const USER_LOOKUP_ENDPOINT_PATH: &str = "users/by";
+use super::API_ENDPOINT_BASE;
 
+/// Response from Twitter users lookup api.
 #[derive(Debug, Deserialize)]
-pub struct User {
-    pub data: Vec<Data>,
+pub(crate) struct Users {
+    data: Option<Vec<Data>>,
+    errors: Option<Vec<Error>>,
 }
 
-impl User {
-    /// Parameter usernames is a string contains comma separated usernames.
-    pub fn url_from_usernames_query(base_url: &Url, usernames: &str) -> Result<Url, String> {
+#[derive(Debug, Deserialize)]
+struct Data {
+    id: String,
+    name: String,
+    username: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct Error {
+    value: String,
+    detail: String,
+    title: String,
+    resource_type: String,
+    parameter: String,
+    resource_id: String,
+    #[serde(rename(deserialize = "type"))]
+    typ: String,
+}
+
+impl Users {
+    /// Fetch users to return a username to user_id map.
+    pub(crate) async fn fetch(
+        client: &Client,
+        usernames: Vec<&str>,
+        auth_token: &str,
+    ) -> Result<Option<HashMap<String, String>>, String> {
+        let endpoint = Self::endpoint(usernames)?;
+        Self::send_request(client, endpoint, auth_token).await
+    }
+
+    fn endpoint(usernames: Vec<&str>) -> Result<Url, String> {
+        let base_url = Url::parse(API_ENDPOINT_BASE).unwrap();
+        let usernames = usernames.join(",");
         let mut url = Url::options()
-            .base_url(Some(base_url))
-            .parse(USER_LOOKUP_ENDPOINT_PATH)
+            .base_url(Some(&base_url))
+            .parse("users/by")
             .map_err(|error| format!("could not parse user lookup endpoint: {:?}", error))?;
         url.set_query(Some(format!("usernames={}", usernames).as_str()));
 
         Ok(url)
     }
 
-    // No unit test for this function.
-    /// get_user_ids returns user_ids corresponding to the orders of usernames.
-    pub fn get_user_ids(
+    async fn send_request(
         client: &Client,
         endpoint: Url,
         auth_token: &str,
-    ) -> Result<Option<Vec<String>>, String> {
+    ) -> Result<Option<HashMap<String, String>>, String> {
         let response = client
             .get(endpoint)
             .bearer_auth(auth_token)
             .send()
+            .await
             .map_err(|error| format!("get request failed: {:?}", error))?;
         if !response.status().is_success() {
             warn!(
@@ -42,59 +74,99 @@ impl User {
             return Ok(None);
         }
 
-        let user: User = response
+        let users: Users = response
             .json()
+            .await
             .map_err(|error| format!("could not deserialize json response: {:?}", error))?;
-        let user_ids: Vec<String> = user.data.into_iter().map(|data| data.id).collect();
-
-        Ok(Some(user_ids))
+        if users.errors.is_some() {
+            warn!(
+                "Errors occurred when requesting users: {:#?}",
+                users.errors.unwrap()
+            );
+        }
+        if let Some(users) = users.data {
+            let user_ids = users
+                .into_iter()
+                .map(|data| (data.username, data.id))
+                .collect();
+            Ok(Some(user_ids))
+        } else {
+            Ok(None)
+        }
     }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Data {
-    pub id: String,
-    pub name: String,
-    pub username: String,
 }
 
 #[cfg(test)]
 mod tests {
-    use super::User;
-    use crate::twitter::API_ENDPOINT_BASE;
+    use log::debug;
+    use reqwest::Client;
     use serde_json::Result;
-    use url::Url;
+
+    use super::Users;
+    use crate::twitter::API_ENDPOINT_BASE;
 
     #[test]
-    fn test_url_from_usernames_query() {
-        const USER_NAMES: &str = "john,mick";
-        let base_url = Url::parse(API_ENDPOINT_BASE).unwrap();
-        let endpoint = User::url_from_usernames_query(&base_url, USER_NAMES).unwrap();
-
+    fn endpoint() {
+        let usernames = vec!["john", "mick"];
+        let endpoint = Users::endpoint(usernames).unwrap();
         assert_eq!(
-            format!("{}users/by?usernames={}", API_ENDPOINT_BASE, USER_NAMES),
+            format!("{}users/by?usernames={}", API_ENDPOINT_BASE, "john,mick"),
             endpoint.as_str()
         );
     }
 
     #[test]
-    fn test_parse_user() -> Result<()> {
-        let user_data = r#"
-        {
+    fn parse_users() -> Result<()> {
+        let users_data = r#"
+          {
             "data": [
               {
                 "id": "2244994945",
                 "name": "Twitter Dev",
                 "username": "TwitterDev"
               }
+            ],
+            "errors": [
+              {
+                "value": "xn47mzh437",
+                "detail": "Could not find user with usernames: [xn47mzh437].",
+                "title": "Not Found Error",
+                "resource_type": "user",
+                "parameter": "usernames",
+                "resource_id": "xn47mzh437",
+                "type": "https://api.twitter.com/2/problems/resource-not-found"
+              }
             ]
           }
         "#;
 
-        let u: User = serde_json::from_str(user_data)?;
-
-        assert_eq!("2244994945", u.data[0].id);
-
+        let users: Users = serde_json::from_str(users_data)?;
+        assert_eq!("2244994945", users.data.unwrap()[0].id);
         Ok(())
+    }
+
+    // To test this function:
+    // RUST_LOG=debug cargo test fetch -- --ignored '[auth_token]' TwitterDev,jack,1ws23x
+    #[tokio::test]
+    #[ignore = "require command line input"]
+    async fn fetch() {
+        init();
+
+        let mut args = std::env::args().rev();
+        let arg = args.next().unwrap();
+        let usernames = arg.split(',').collect();
+        let auth_token = args.next().unwrap();
+
+        let client = Client::new();
+        let users = Users::fetch(&client, usernames, auth_token.as_str())
+            .await
+            .unwrap();
+        if let Some(users) = users {
+            debug!("Users: {:#?}", users);
+        }
+    }
+
+    fn init() {
+        let _ = env_logger::builder().try_init();
     }
 }
