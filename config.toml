@@ -1,0 +1,18 @@
+rocksdb_path = "rocksdb" # Path to Rocksdb
+twitter_token = "xxx"    # Twitter API token
+telegram_token = "xxx"   # Telegram Bot API token
+
+# Poll Twitter timeline from user(s)
+[[poll]]
+included = true                         # Whether this user is included for polling
+username = "TwitterDev"                 # Twitter username
+max_results = 5                         # Max results per page of timeline
+start_time = "2022-10-25T00:00:00.000Z" # Start time of timeline to poll
+end_time = "2022-11-01T00:00:00.000Z"   # End time of timeline to poll
+since_id = "xyz"                        # Tweet id to continue to poll
+
+# Push polled data to Telegram channel(s)
+[[push]]
+included = true       # Whether this channel is included for pushing
+from = "TwitterDev"   # From which Twitter user's timeline for pushing
+username = "some_bot" # Telegram channel
