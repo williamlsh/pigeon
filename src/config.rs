@@ -3,28 +3,34 @@ use std::path::PathBuf;
 
 #[derive(Deserialize, Debug)]
 pub struct Config {
-    rocksdb_path: PathBuf,
-    twitter_token: Option<String>,
-    telegram_token: Option<String>,
-    poll: Option<Vec<PollConfig>>,
-    push: Option<Vec<PushConfig>>,
+    pub(crate) rocksdb_path: PathBuf,
+    pub(crate) twitter_token: Option<String>,
+    pub(crate) telegram_token: Option<String>,
+    pub(crate) poll: Option<Vec<PollConfig>>,
+    pub(crate) push: Option<Vec<PushConfig>>,
 }
 
 #[derive(Deserialize, Debug)]
 pub(crate) struct PollConfig {
-    included: bool,
-    username: String,
-    max_results: Option<u8>,
-    start_time: Option<String>,
-    end_time: Option<String>,
-    since_id: Option<String>,
+    pub(crate) included: bool,
+    pub(crate) username: String,
+    pub(crate) max_results: Option<u8>,
+    pub(crate) start_time: Option<String>,
+    pub(crate) end_time: Option<String>,
+    pub(crate) since_id: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
 pub(crate) struct PushConfig {
-    included: bool,
-    from: String,
-    username: String,
+    pub(crate) included: bool,
+    pub(crate) from: String,
+    pub(crate) username: String,
+}
+
+impl PollConfig {
+    pub(crate) fn insert_start_time(&mut self, start_time: Option<String>) {
+        start_time.map(|start_time| self.start_time.get_or_insert(start_time));
+    }
 }
 
 #[cfg(test)]
