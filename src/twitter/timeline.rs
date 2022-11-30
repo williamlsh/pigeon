@@ -1,16 +1,165 @@
-use log::{error, info, trace, warn};
-use reqwest::blocking::Client;
+use log::{info, trace, warn};
+use reqwest::Client;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
+use super::API_ENDPOINT_BASE;
+
+/// Timeline continually yields all tweets in timeline which may be paginated.
+pub(crate) struct Timeline<'a> {
+    client: &'a Client,
+    url: Url,
+    auth_token: &'a str,
+    pagination_token: Option<PaginationToken>,
+    page: u8,
+    texts: <Vec<Data> as IntoIterator>::IntoIter,
+    meta: Option<Meta>,
+}
+
+#[derive(Debug)]
+pub enum PaginationToken {
+    NextToken(String),
+    TweetID(String),
+}
+
+impl<'a> Timeline<'a> {
+    pub(crate) fn new(
+        client: &'a Client,
+        url: Url,
+        auth_token: &'a str,
+        pagination_token: Option<PaginationToken>,
+    ) -> Self {
+        Self {
+            client,
+            url,
+            auth_token,
+            pagination_token,
+            page: 0,
+            texts: vec![].into_iter(),
+            meta: None,
+        }
+    }
+
+    pub(crate) async fn try_next(&mut self) -> Result<Option<Data>, String> {
+        if let Some(text) = self.texts.next() {
+            return Ok(Some(text));
+        }
+
+        // Check if pagination token is present.
+        let url = match self.pagination_token.take() {
+            Some(pagination_token) => self.url_with_pagination(pagination_token),
+            None => match self.page {
+                // The first request.
+                0 => self.url.clone(),
+                // The last request.
+                n => {
+                    info!("Timeline poll finished, total pages: {}", n);
+                    return Ok(None);
+                }
+            },
+        };
+
+        let response = self
+            .client
+            .get(url)
+            .bearer_auth(self.auth_token)
+            .send()
+            .await
+            .map_err(|error| format!("request timeline failed: {:?}", error))?;
+        // Check response status.
+        match response.status() {
+            StatusCode::OK => {
+                let mut timeline: Tweets = response
+                    .json()
+                    .await
+                    .map_err(|error| format!("could not deserialize json response: {:?}", error))?;
+                trace!("got timeline: {:?}", timeline);
+
+                // Keep the pagination token for next request.
+                self.pagination_token = timeline
+                    .meta
+                    .next_token
+                    .take()
+                    .map(PaginationToken::NextToken);
+
+                // Increase page number on request success.
+                match timeline.data {
+                    Some(tweets) => {
+                        self.page += 1;
+                        self.texts = tweets.into_iter();
+                        Ok(self.texts.next())
+                    }
+                    // In a case that "start_time" query parameter is specified in timeline request,
+                    // "next_token" is always returned in the last page metadata. To avoid endless unnecessary
+                    // page requests, we exit immediately here.
+                    None => Ok(None),
+                }
+            }
+            StatusCode::TOO_MANY_REQUESTS => {
+                info!(
+                "twitter timeline endpoint rate limit reached, please wait for at least 15 mins: {}",
+                response.status()
+            );
+                Ok(None)
+            }
+            x => {
+                warn!(
+                    "request not successful, got response status: {} and body: {}",
+                    x,
+                    response.text().await.unwrap_or_else(|_| "".to_string())
+                );
+                Ok(None)
+            }
+        }
+    }
+
+    /// We don't mutate original `Url`, we return a clone one since `Url.append_pair` will append duplicated key value pairs.
+    fn url_with_pagination(&self, pagination_token: PaginationToken) -> Url {
+        let mut url = self.url.clone();
+        match pagination_token {
+            PaginationToken::NextToken(next_token) => url
+                .query_pairs_mut()
+                .append_pair("pagination_token", &next_token),
+            PaginationToken::TweetID(tweet_id) => {
+                url.query_pairs_mut().append_pair("since_id", &tweet_id)
+            }
+        };
+        url
+    }
+}
+
+/// Response from Twitter timeline api.
+#[derive(Debug, Deserialize, Clone)]
+pub(crate) struct Tweets {
+    data: Option<Vec<Data>>,
+    meta: Meta,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub(crate) struct Data {
+    id: String,
+    created_at: String,
+    text: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+struct Meta {
+    oldest_id: Option<String>,
+    newest_id: Option<String>,
+    result_count: Option<u8>,
+    next_token: Option<String>,
+}
+
+// Builds a Twitter user timeline endpoint URL.
 #[derive(Debug, Clone)]
 pub struct UrlBuilder(Url);
 
 impl UrlBuilder {
-    pub fn new(base_url: &Url, user_id: &str) -> Self {
+    pub fn new(user_id: &str) -> Self {
+        let base_url = Url::parse(API_ENDPOINT_BASE).unwrap();
         let url = Url::options()
-            .base_url(Some(base_url))
+            .base_url(Some(&base_url))
             .parse(format!("users/{}/tweets", user_id).as_str())
             .expect("could not parse url form user_id segment");
         Self(url)
@@ -30,309 +179,148 @@ impl UrlBuilder {
         self
     }
 
+    /// String format for `start_time` is RFC3339, for example, "2020-12-12T01:00:00Z".
+    pub fn start_time(mut self, start_time: &str) -> Self {
+        self.0
+            .query_pairs_mut()
+            .append_pair("start_time", start_time);
+        self
+    }
+
+    /// String format for `end_time` is RFC3339, for example, "2020-12-12T01:00:00Z".
+    pub fn end_time(mut self, end_time: &str) -> Self {
+        self.0.query_pairs_mut().append_pair("end_time", end_time);
+        self
+    }
+
     pub fn build(self) -> Url {
         self.0
     }
 }
 
-#[derive(Debug)]
-pub enum PaginationToken {
-    NextToken(String),
-    TweetID(String),
-}
-
-/// A PaginatedTimeline only supports one twitter user's timeline.
-#[derive(Debug)]
-pub struct PaginatedTimeline<'a> {
-    client: &'a Client,
-    url: Url,
-    auth_token: &'a str,
-    pagination_token: Option<PaginationToken>,
-    page: usize,
-}
-
-impl<'a> PaginatedTimeline<'a> {
-    pub fn new(
-        client: &'a Client,
-        url: Url,
-        auth_token: &'a str,
-        pagination_token: Option<PaginationToken>,
-    ) -> Self {
-        Self {
-            client,
-            url,
-            auth_token,
-            pagination_token,
-            page: 0,
-        }
-    }
-
-    fn try_next(&mut self) -> Result<Option<Timeline>, String> {
-        // Check if pagination token is present.
-        let url = match self.pagination_token.take() {
-            Some(pagination_token) => self.url_with_pagination(pagination_token),
-            None => match self.page {
-                // The first request.
-                0 => self.url.clone(),
-                // The last request.
-                n => {
-                    info!("All pages are done, total pages: {}", n);
-                    return Ok(None);
-                }
-            },
-        };
-
-        let response = self
-            .client
-            .get(url)
-            .bearer_auth(self.auth_token)
-            .send()
-            .map_err(|error| format!("get request failed: {:?}", error))?;
-        // Check response status.
-        match response.status() {
-            StatusCode::OK => {
-                let timeline: Timeline = response
-                    .json()
-                    .map_err(|error| format!("could not deserialize json response: {:?}", error))?;
-                trace!("got timeline: {:?}", timeline);
-
-                // Keep the pagination token for next request.
-                self.pagination_token = timeline
-                    .meta
-                    .next_token
-                    .clone()
-                    .map(PaginationToken::NextToken);
-
-                // Increase page number on request success.
-                self.page += 1;
-                Ok(Some(timeline))
-            }
-            StatusCode::TOO_MANY_REQUESTS => {
-                info!(
-                    "twitter timeline endpoint rate limit reached, please wait for at least 15 mins: {}",
-                    response.status()
-                );
-                Ok(None)
-            }
-            x => {
-                warn!(
-                    "request not successful, got response status: {} and body: {}",
-                    x,
-                    response.text().unwrap_or_else(|_| "".to_string())
-                );
-                Ok(None)
-            }
-        }
-    }
-
-    // No unit test for this function.
-    /// Since Url.append_pair will append duplicated key value pairs,
-    /// so we don't mutate original Url, we return a clone one.
-    fn url_with_pagination(&self, pagination_token: PaginationToken) -> Url {
-        let mut url = self.url.clone();
-        match pagination_token {
-            PaginationToken::NextToken(next_token) => url
-                .query_pairs_mut()
-                .append_pair("pagination_token", &next_token),
-            PaginationToken::TweetID(tweet_id) => {
-                url.query_pairs_mut().append_pair("since_id", &tweet_id)
-            }
-        };
-        url
-    }
-}
-
-impl<'a> Iterator for PaginatedTimeline<'a> {
-    type Item = Timeline;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.try_next() {
-            Ok(timeline) => timeline,
-            Err(err) => {
-                error!(
-                    "an error occurred when iterating paginated timeline: {}",
-                    err
-                );
-                None
-            }
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Timeline {
-    pub data: Option<Vec<Data>>,
-    pub meta: Meta,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Data {
-    pub id: String,
-    pub created_at: String,
-    pub text: String,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Meta {
-    oldest_id: String,
-    pub newest_id: String,
-    result_count: u8,
-    pub next_token: Option<String>,
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{Timeline, UrlBuilder};
-    use crate::twitter::API_ENDPOINT_BASE;
-    use url::Url;
+    use log::debug;
+    use reqwest::Client;
 
-    const USER_ID: &str = "abc";
+    use super::{PaginationToken, Timeline, Tweets, UrlBuilder, API_ENDPOINT_BASE};
 
     #[test]
-    fn test_new_url() {
-        let base_url = Url::parse(API_ENDPOINT_BASE).unwrap();
-        let url = UrlBuilder::new(&base_url, USER_ID);
-
+    fn build_url() {
+        let url = UrlBuilder::new("123").build();
         assert_eq!(
-            format!("{}users/{}/tweets", API_ENDPOINT_BASE, USER_ID),
-            url.0.as_str()
+            format!("{}users/{}/tweets", API_ENDPOINT_BASE, "123"),
+            url.as_str()
         );
     }
 
     #[test]
-    fn test_url_queries() {
-        let base_url = Url::parse(API_ENDPOINT_BASE).unwrap();
-        let url = UrlBuilder::new(&base_url, USER_ID)
-            .tweet_fields(vec!["a", "b", "c"])
-            .max_results(100);
-
+    fn url_queries() {
+        let url = UrlBuilder::new("")
+            .tweet_fields(vec!["created_at"])
+            .max_results(100)
+            .start_time("2022-11-21T12:23:43.812Z")
+            .end_time("2022-11-24T12:23:43.812Z")
+            .build();
         assert_eq!(
-            "tweet.fields=a%2Cb%2Cc&max_results=100",
-            url.0.query().unwrap()
+          "tweet.fields=created_at&max_results=100&start_time=2022-11-21T12%3A23%3A43.812Z&end_time=2022-11-24T12%3A23%3A43.812Z",
+            url.query().unwrap()
         );
     }
 
     #[test]
-    fn test_parse_timeline() {
+    fn parse_timeline() {
         let timeline_data = r#"
         {
           "data": [
             {
-              "text": "Learn how the municipality of The Hague was able to create an improved experience on their roads via social media monitoring  — through their partnership with PublicSonar. \n\nRead about it here: https://t.co/9Ex9oas1kO https://t.co/mJTz4ckm6c",
-              "created_at": "2022-02-28T18:20:00.000Z",
-              "id": "1498362363132747780",
-              "attachments": {
-                "media_keys": [
-                  "3_1496550979738685440"
-                ]
-              }
+              "created_at": "2022-11-02T23:15:29.000Z",
+              "text": "As always, we’re just a Tweet away, so feel free to reach out with any questions. We’re grateful for your partnership to #BuildWhatsNext",
+              "id": "1587946527955329024",
+              "edit_history_tweet_ids": [
+                "1587946527955329024"
+              ]
             },
             {
-              "text": "Bay area, don't forget tomorrow is the first #TwitterDevConnect meetup of 2022! We have a few spots left so RSVP now: https://t.co/AahQG8MzCK https://t.co/5ah3tsCjNJ",
-              "created_at": "2022-02-23T22:45:00.000Z",
-              "id": "1496617113133494273",
-              "attachments": {
-                "media_keys": [
-                  "3_1496540189753176064"
-                ]
-              }
+              "created_at": "2022-11-02T23:15:29.000Z",
+              "text": "We’ll still celebrate the soon-to-be-announced winners of our Chirp Developer Challenge - stay tuned for more details!",
+              "id": "1587946526617264128",
+              "edit_history_tweet_ids": [
+                "1587946526617264128"
+              ]
             },
             {
-              "text": "Raw data to insights in a matter of minutes.⏱ Introducing the Twitter API toolkit for Google Cloud: access the brand new guide to easily process, analyze, and visualize massive amounts of Tweets today.👇 #BuildWhatsNext\n\nhttps://t.co/jEXo0X6Fsp",
-              "created_at": "2022-02-22T19:58:48.000Z",
-              "id": "1496212901383884805"
+              "created_at": "2022-11-02T23:15:28.000Z",
+              "text": "We’re currently hard at work to make Twitter better for everyone, including developers! We’ve decided to cancel the #Chirp developer conference while we build some things that we’re excited to share with you soon.",
+              "id": "1587946525245816832",
+              "edit_history_tweet_ids": [
+                "1587946525245816832"
+              ]
             },
             {
-              "text": "Join @ashevat, @jessicagarson and @alanbenlee Thursday 2/24 at 3:05pm PT for this month’s town hall conversation on the recent updates to the Twitter Developer Platform. https://t.co/aJ7yayEwbx",
-              "created_at": "2022-02-21T18:24:39.000Z",
-              "id": "1495826817638633472"
+              "created_at": "2022-11-01T19:00:00.000Z",
+              "text": "💡 #TipTuesday:  Ever wondered how to get the video URL from a Tweet in Twitter API v2? 👀 Here’s a walkthrough, using our TypeScript SDK. 💫\n\nhttps://t.co/tFQ4Eskq7t",
+              "id": "1587519847281397767",
+              "edit_history_tweet_ids": [
+                "1587519847281397767"
+              ]
             },
             {
-              "text": "We want to meet you! If you are in the Bay Area, join us for a #TwitterDev Connect meetup on February 24! RSVP here: https://t.co/AahQG8uYea",
-              "created_at": "2022-02-18T17:23:14.000Z",
-              "id": "1494724197657899008"
-            },
-            {
-              "text": "New ways to build discovery and analytics tools for #TwitterSpaces. Learn more about our new endpoint that returns Tweets from a Space, plus the new subcriber_count field. 👀  ⬇️  #BuildWhatsNext\n\nhttps://t.co/Ev3Stajmjl",
-              "created_at": "2022-02-17T18:58:45.000Z",
-              "id": "1494385850649436160"
-            },
-            {
-              "text": "Celebrate the #GoodBots! Today, automated account labels are available to all developer-created bot accounts. https://t.co/GyT7Duh9Yu",
-              "created_at": "2022-02-16T20:12:20.000Z",
-              "referenced_tweets": [
-                {
-                  "type": "quoted",
-                  "id": "1494040671048581123"
-                }
-              ],
-              "id": "1494041977972744200"
-            },
-            {
-              "text": "Stay relevant! The sort_order parameter now allows you to return Tweets based on relevancy when using the search endpoints on the Twitter API v2. #BuildWhatsNext https://t.co/ULOQlTXrqd",
-              "created_at": "2022-02-09T19:03:07.000Z",
-              "id": "1491487846623956993"
-            },
-            {
-              "text": "We've created a place where people on Twitter can find and get started with ready-to-use Twitter solutions from our developer community. 🔍 https://t.co/WV8sBHDxa1",
-              "created_at": "2022-02-02T17:41:27.000Z",
-              "referenced_tweets": [
-                {
-                  "type": "quoted",
-                  "id": "1488619414584922116"
-                }
-              ],
-              "id": "1488930580054085633"
-            },
-            {
-              "text": "Interested in learning how to make bots with the Twitter API? @JessicaGarson's tutorial walks you through her latest bot @FactualCat, which Tweets out cat facts daily. #BuildWhatsNext \n\nhttps://t.co/RBEbZCmNNq",
-              "created_at": "2022-02-01T20:30:09.000Z",
-              "id": "1488610643766824961"
+              "created_at": "2022-10-31T13:00:01.000Z",
+              "text": "✍️Fill in the blank ⬇️\n\nI start my morning off by _____",
+              "id": "1587066866824085505",
+              "edit_history_tweet_ids": [
+                "1587066866824085505"
+              ]
             }
           ],
-          "includes": {
-            "media": [
-              {
-                "url": "https://pbs.twimg.com/media/FMTRL9-WUAA9RMf.png",
-                "media_key": "3_1496550979738685440",
-                "type": "photo",
-                "height": 205,
-                "width": 253
-              },
-              {
-                "url": "https://pbs.twimg.com/media/FMTHX6JVcAAC2dv.jpg",
-                "media_key": "3_1496540189753176064",
-                "type": "photo",
-                "height": 900,
-                "width": 1600
-              }
-            ],
-            "tweets": [
-              {
-                "text": "Get your bots in here! Remember when we chatted about all things, #GoodBots? Well now we are celebrating the bots who make a positive contribution to Twitter, all over the world. https://t.co/e1OqJjRZiG",
-                "created_at": "2022-02-16T20:07:08.000Z",
-                "id": "1494040671048581123",
-                "attachments": {
-                  "media_keys": [
-                    "16_1494039614381862912"
-                  ]
-                }
-              },
-              {
-                "text": "Put the NEW Twitter Toolbox to work for you. These ready-to-use tools are low-cost and built by our developer community to help you get even more out of Twitter.",
-                "created_at": "2022-02-01T21:05:00.000Z",
-                "id": "1488619414584922116"
-              }
-            ]
-          },
           "meta": {
-            "oldest_id": "1488610643766824961",
-            "newest_id": "1498362363132747780",
-            "result_count": 10,
-            "next_token": "7140dibdnow9c7btw3z45ddzr2fig4a4y9q0vs4alejap"
+            "result_count": 5,
+            "newest_id": "1587946527955329024",
+            "oldest_id": "1587066866824085505",
+            "next_token": "7140dibdnow9c7btw423x78o50g6e358t5r7iusluud6d"
           }
         }"#;
 
-        serde_json::from_str::<Timeline>(timeline_data).unwrap();
+        serde_json::from_str::<Tweets>(timeline_data).unwrap();
+    }
+
+    // To test this function:
+    // RUST_LOG=debug cargo test tweets -- --ignored '[auth_token]'
+    #[tokio::test]
+    #[ignore = "require command line input"]
+    async fn tweets() {
+        init();
+
+        let mut args = std::env::args().rev();
+        let auth_token = args.next().unwrap();
+
+        let client = Client::new();
+        let endpoint = UrlBuilder::new("2244994945")
+            .tweet_fields(vec!["created_at"])
+            .max_results(10)
+            .start_time("2022-10-25T00:00:00.000Z")
+            .end_time("2022-11-04T00:00:00.000Z")
+            .build();
+        {
+            debug!("Timeline without pagination token");
+            let mut timeline = Timeline::new(&client, endpoint.clone(), &auth_token, None);
+
+            while let Some(tweet) = timeline.try_next().await.unwrap() {
+                debug!("{:#?}", tweet);
+            }
+        }
+        {
+            debug!("Timeline with pagination token");
+            let tweet_id = PaginationToken::TweetID("1586025008899448832".into());
+            let mut timeline = Timeline::new(&client, endpoint, &auth_token, Some(tweet_id));
+            while let Some(tweet) = timeline.try_next().await.unwrap() {
+                debug!("{:#?}", tweet);
+            }
+        }
+    }
+
+    fn init() {
+        let _ = env_logger::builder().try_init();
     }
 }
