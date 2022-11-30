@@ -18,7 +18,7 @@ pub(crate) struct Timeline<'a> {
 }
 
 #[derive(Debug)]
-pub enum PaginationToken {
+pub(crate) enum PaginationToken {
     NextToken(String),
     TweetID(String),
 }
@@ -138,9 +138,9 @@ pub(crate) struct Tweets {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub(crate) struct Data {
-    id: String,
-    created_at: String,
-    text: String,
+    pub(crate) id: String,
+    pub(crate) created_at: String,
+    pub(crate) text: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -153,10 +153,10 @@ struct Meta {
 
 // Builds a Twitter user timeline endpoint URL.
 #[derive(Debug, Clone)]
-pub struct UrlBuilder(Url);
+pub(crate) struct UrlBuilder(Url);
 
 impl UrlBuilder {
-    pub fn new(user_id: &str) -> Self {
+    pub(crate) fn new(user_id: &str) -> Self {
         let base_url = Url::parse(API_ENDPOINT_BASE).unwrap();
         let url = Url::options()
             .base_url(Some(&base_url))
@@ -165,35 +165,41 @@ impl UrlBuilder {
         Self(url)
     }
 
-    pub fn tweet_fields(mut self, tweet_fields: Vec<&str>) -> Self {
+    pub(crate) fn tweet_fields(mut self, tweet_fields: Vec<&str>) -> Self {
         self.0
             .query_pairs_mut()
             .append_pair("tweet.fields", &tweet_fields.join(","));
         self
     }
 
-    pub fn max_results(mut self, max_results: u8) -> Self {
-        self.0
-            .query_pairs_mut()
-            .append_pair("max_results", &max_results.to_string());
+    pub(crate) fn max_results(mut self, max_results: Option<u8>) -> Self {
+        if let Some(max_results) = max_results {
+            self.0
+                .query_pairs_mut()
+                .append_pair("max_results", &max_results.to_string());
+        }
         self
     }
 
     /// String format for `start_time` is RFC3339, for example, "2020-12-12T01:00:00Z".
-    pub fn start_time(mut self, start_time: &str) -> Self {
-        self.0
-            .query_pairs_mut()
-            .append_pair("start_time", start_time);
+    pub(crate) fn start_time(mut self, start_time: Option<&str>) -> Self {
+        if let Some(start_time) = start_time {
+            self.0
+                .query_pairs_mut()
+                .append_pair("start_time", start_time);
+        }
         self
     }
 
     /// String format for `end_time` is RFC3339, for example, "2020-12-12T01:00:00Z".
-    pub fn end_time(mut self, end_time: &str) -> Self {
-        self.0.query_pairs_mut().append_pair("end_time", end_time);
+    pub(crate) fn end_time(mut self, end_time: Option<&str>) -> Self {
+        if let Some(end_time) = end_time {
+            self.0.query_pairs_mut().append_pair("end_time", end_time);
+        }
         self
     }
 
-    pub fn build(self) -> Url {
+    pub(crate) fn build(self) -> Url {
         self.0
     }
 }
@@ -218,9 +224,9 @@ mod tests {
     fn url_queries() {
         let url = UrlBuilder::new("")
             .tweet_fields(vec!["created_at"])
-            .max_results(100)
-            .start_time("2022-11-21T12:23:43.812Z")
-            .end_time("2022-11-24T12:23:43.812Z")
+            .max_results(Some(100))
+            .start_time(Some("2022-11-21T12:23:43.812Z"))
+            .end_time(Some("2022-11-24T12:23:43.812Z"))
             .build();
         assert_eq!(
           "tweet.fields=created_at&max_results=100&start_time=2022-11-21T12%3A23%3A43.812Z&end_time=2022-11-24T12%3A23%3A43.812Z",
@@ -298,9 +304,9 @@ mod tests {
         let client = Client::new();
         let endpoint = UrlBuilder::new("2244994945")
             .tweet_fields(vec!["created_at"])
-            .max_results(10)
-            .start_time("2022-10-25T00:00:00.000Z")
-            .end_time("2022-11-04T00:00:00.000Z")
+            .max_results(Some(10))
+            .start_time(Some("2022-10-25T00:00:00.000Z"))
+            .end_time(Some("2022-11-04T00:00:00.000Z"))
             .build();
         {
             debug!("Timeline without pagination token");

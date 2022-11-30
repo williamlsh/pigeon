@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use pigeon::Config;
+use pigeon::{App, Config};
 use std::path::PathBuf;
 use tokio::{fs::File, io::AsyncReadExt};
 
@@ -26,10 +26,10 @@ async fn main() -> anyhow::Result<()> {
     env_logger::init();
 
     let cli = Cli::parse();
-    let mut config = load_config(cli.config_path).await?;
-
+    let config = load_config(cli.config_path).await?;
+    let mut app = App::new(config).unwrap();
     match cli.command {
-        Command::Poll => {}
+        Command::Poll => app.poll().await.unwrap(),
         Command::Push => {}
     }
     Ok(())
