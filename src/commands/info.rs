@@ -8,8 +8,8 @@ pub(crate) fn info(database: &Database) -> anyhow::Result<()> {
 
 fn display_state(database: &Database) -> anyhow::Result<()> {
     println!("Data in column family state:");
-    if let Some(state_iterator) = database.iterator_cf("state") {
-        for entry in state_iterator {
+    if let Some(state) = database.iterator_cf("state") {
+        for entry in state {
             let (key, value) = entry?;
             let key_str = str::from_utf8(&key)?;
             let value_str = str::from_utf8(&value)?;
@@ -21,8 +21,8 @@ fn display_state(database: &Database) -> anyhow::Result<()> {
 
 fn display_timeline(database: &Database) -> anyhow::Result<()> {
     println!("Data in column family timeline:");
-    if let Some(timeline_iterator) = database.iterator_cf("timeline") {
-        for entry in timeline_iterator {
+    if let Some(timeline) = database.iterator_cf("timeline") {
+        for entry in timeline {
             let (key, value) = entry?;
             let key_str = str::from_utf8(&key)?;
             let value_str: Tweet = serde_json::from_slice(&value)?;
