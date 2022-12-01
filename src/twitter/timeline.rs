@@ -173,7 +173,8 @@ impl UrlBuilder {
     }
 
     pub(crate) fn max_results(mut self, max_results: Option<u8>) -> Self {
-        if let Some(max_results) = max_results {
+        // Set default value: 100.
+        if let Some(max_results) = max_results.or(Some(100)) {
             self.0
                 .query_pairs_mut()
                 .append_pair("max_results", &max_results.to_string());
