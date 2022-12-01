@@ -1,20 +1,35 @@
+use reqwest::{Client, Response};
 use serde::Serialize;
 use url::Url;
 
-const API_ENDPOINT_BASE: &str = "https://api.telegram.org/";
+/// A message sent by Telegram bot.
+#[derive(Debug, Serialize)]
+pub(crate) struct Message {
+    /// Telegram channel username.
+    pub(crate) chat_id: String,
+    /// Message text body.
+    pub(crate) text: String,
+}
 
-pub fn url_from_method(token: &str, method: &str) -> Result<Url, String> {
-    let api = Url::parse(API_ENDPOINT_BASE)
+impl Message {
+   pub(crate) async fn send(&self, client: &Client, telegram_token: &str) -> Result<Response, String> {
+        client
+            .post(endpoint(telegram_token)?)
+            .json(self)
+            .send()
+            .await
+            .map_err(|err| format!("Error sending post request: {:?}", err))
+    }
+}
+
+/// An endpoint for sending messages by Telegram bot.
+/// See: https://core.telegram.org/bots/api#sendmessage
+fn endpoint(token: &str) -> Result<Url, String> {
+    let api = Url::parse("https://api.telegram.org/")
         .map_err(|error| format!("could not parse telegram api base endpoint: {}", error))?;
     let url = Url::options()
         .base_url(Some(&api))
-        .parse(format!("/bot{token}/{method}").as_str())
+        .parse(format!("/bot{token}/sendMessage").as_str())
         .map_err(|error| format!("could not parse path :{}", error))?;
     Ok(url)
-}
-
-#[derive(Debug, Serialize)]
-pub struct Message {
-    pub chat_id: String,
-    pub text: String,
 }
