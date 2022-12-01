@@ -10,7 +10,7 @@ pub struct Config {
     pub(crate) push: Option<Vec<PushConfig>>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub(crate) struct PollConfig {
     pub(crate) included: bool,
     pub(crate) username: String,

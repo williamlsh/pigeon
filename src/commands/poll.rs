@@ -1,4 +1,5 @@
 use chrono::{DateTime, Duration};
+use log::{info, trace};
 use reqwest::Client;
 use std::{collections::HashMap, str};
 use url::Url;
@@ -35,6 +36,7 @@ impl Poll {
             let start_time = Self::fetch_state(database, &cfg.username)?;
             // Note: `start_time` in poll config has higher priority than that in persistent state.
             cfg.insert_start_time(start_time);
+            info!("Poll timeline with config: {:?}", cfg);
 
             let endpoint = Self::endpoint(cfg, &user_map);
             // Note: `since_id` takes higher priority than `start_time` in request query parameters.
@@ -73,6 +75,7 @@ impl Poll {
     }
 
     fn upsert_state(database: &Database, username: &str, created_at: &str) -> Result<(), String> {
+        trace!("Upsert state: key: {}, value: {}", username, created_at);
         database.put_cf("state", username, created_at)
     }
 
@@ -80,6 +83,7 @@ impl Poll {
         let key = format!("{}:{}", username, tweet.id);
         let value = serde_json::to_vec(&tweet)
             .map_err(|err| format!("could not serialize tweet data to json: {:?}", err))?;
+        trace!("Insert tweet: key: {}, value: {:?}", key, tweet);
         database.put_cf("timeline", key, value)
     }
 
@@ -104,5 +108,58 @@ impl Poll {
         Users::fetch(client, usernames, &self.twitter_token)
             .await?
             .ok_or_else(|| "No Twitter users found".into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use reqwest::Client;
+    use rocksdb::{Options, DB};
+
+    use super::Poll;
+    use crate::{config::PollConfig, database::Database};
+
+    // To test this function:
+    // RUST_LOG=debug cargo test poll -- --ignored '[auth_token]'
+    #[tokio::test]
+    #[ignore = "require command line input"]
+    async fn poll() {
+        init();
+
+        let mut args = std::env::args().rev();
+        let auth_token = args.next();
+
+        let rocksdb_path = "test";
+        let database = Database::open(rocksdb_path);
+        let client = Client::new();
+        let mut poll_config = vec![PollConfig {
+            included: true,
+            username: "TwitterDev".into(),
+            max_results: Some(5),
+            start_time: Some("2022-10-25T00:00:00.000Z".into()),
+            end_time: Some("2022-10-30T00:00:00.000Z".into()),
+            since_id: None,
+        }];
+        {
+            let mut poll = Poll::new(auth_token.clone(), poll_config.clone()).unwrap();
+            poll.run(&client, &database).await.unwrap();
+        }
+        {
+            // Remove `start_time` and `end_time` fields.
+            poll_config.iter_mut().for_each(|cfg| {
+                cfg.start_time.take();
+                cfg.end_time.replace("2022-12-01T00:00:00.000Z".into());
+            });
+            let mut poll = Poll::new(auth_token, poll_config).unwrap();
+            // Poll again from last time.
+            poll.run(&client, &database).await.unwrap();
+        }
+
+        drop(database);
+        DB::destroy(&Options::default(), rocksdb_path).unwrap();
+    }
+
+    fn init() {
+        let _ = env_logger::builder().try_init();
     }
 }
