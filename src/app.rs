@@ -1,4 +1,9 @@
-use crate::{commands::Poll, config::PollConfig, database::Database, Config};
+use crate::{
+    commands::{info, Poll},
+    config::PollConfig,
+    database::Database,
+    Config,
+};
 use reqwest::Client;
 
 /// Application entry.
@@ -23,6 +28,10 @@ impl App {
         Poll::new(self.config.twitter_token.take(), self.poll_config()?)?
             .run(&self.client, &self.database)
             .await
+    }
+
+    pub fn info(&self) -> Result<(), String> {
+        info(&self.database).map_err(|err| format!("Error displaying database data: {:?}", err))
     }
 
     /// Returns poll configs that are included.

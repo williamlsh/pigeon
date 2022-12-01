@@ -1,4 +1,4 @@
-use rocksdb::{ColumnFamilyDescriptor, Options, DB};
+use rocksdb::{ColumnFamilyDescriptor, DBIterator, IteratorMode, Options, DB};
 use std::path::Path;
 
 #[derive(Debug)]
@@ -48,6 +48,12 @@ impl Database {
             },
             None => Err(format!("no such column family: {}", cf)),
         }
+    }
+
+    pub(crate) fn iterator_cf(&self, cf: &str) -> Option<DBIterator> {
+        self.0
+            .cf_handle(cf)
+            .map(|cf_handle| self.0.iterator_cf(cf_handle, IteratorMode::Start))
     }
 }
 

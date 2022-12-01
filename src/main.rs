@@ -19,6 +19,8 @@ enum Command {
     Poll,
     /// Push timeline to Telegram channel(s)
     Push,
+    /// Display overview information about Database
+    Info,
 }
 
 #[tokio::main]
@@ -31,6 +33,7 @@ async fn main() -> anyhow::Result<()> {
     match cli.command {
         Command::Poll => app.poll().await.unwrap(),
         Command::Push => {}
+        Command::Info => app.info().unwrap(),
     }
     Ok(())
 }
