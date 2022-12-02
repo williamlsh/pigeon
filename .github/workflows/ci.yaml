@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: extractions/setup-just@v1
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -22,24 +22,20 @@ jobs:
           override: true
       - uses: rui314/setup-mold@v1
       - name: Cache build artifacts
-        uses: Swatinem/rust-cache@v1
+        uses: Swatinem/rust-cache@v2
       - name: Install cargo-nextest
         uses: baptiste0928/cargo-install@v1
         with:
           crate: cargo-nextest
-      - name: Check code style
-        run: cargo fmt --all -- --check
       - name: Build code
-        run: |
-          just build
-          readelf -p .comment target/release/pigeon
+        run: just build
       - name: Lint code
         uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --all-features -- -W clippy::all
       - name: Test code
-        run: just test
+        run: cargo nextest run --all-targets --test-threads=1
       # - name: Audit code
       #   uses: actions-rs/audit-check@v1
       #   with:
