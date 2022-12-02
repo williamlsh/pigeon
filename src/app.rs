@@ -1,6 +1,6 @@
 use crate::{
-    commands::{info, Poll},
-    config::PollConfig,
+    commands::{info, Poll, Push},
+    config::{PollConfig, PushConfig},
     database::Database,
     Config,
 };
@@ -30,6 +30,12 @@ impl App {
             .await
     }
 
+    pub async fn push(&mut self) -> Result<(), String> {
+        Push::new(self.config.telegram_token.take(), self.push_config()?)?
+            .run(&self.client, &mut self.database)
+            .await
+    }
+
     pub fn info(&self) -> Result<(), String> {
         info(&self.database).map_err(|err| format!("Error displaying database data: {:?}", err))
     }
@@ -38,6 +44,14 @@ impl App {
     fn poll_config(&mut self) -> Result<Vec<PollConfig>, String> {
         self.config
             .poll
+            .take()
+            .map(|cfg| cfg.into_iter().filter(|cfg| cfg.included).collect())
+            .ok_or_else(|| "Empty poll config".into())
+    }
+
+    fn push_config(&mut self) -> Result<Vec<PushConfig>, String> {
+        self.config
+            .push
             .take()
             .map(|cfg| cfg.into_iter().filter(|cfg| cfg.included).collect())
             .ok_or_else(|| "Empty poll config".into())

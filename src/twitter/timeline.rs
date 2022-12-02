@@ -14,7 +14,6 @@ pub(crate) struct Timeline<'a> {
     pagination_token: Option<PaginationToken>,
     page: u8,
     texts: <Vec<Data> as IntoIterator>::IntoIter,
-    meta: Option<Meta>,
 }
 
 #[derive(Debug)]
@@ -37,7 +36,6 @@ impl<'a> Timeline<'a> {
             pagination_token,
             page: 0,
             texts: vec![].into_iter(),
-            meta: None,
         }
     }
 
