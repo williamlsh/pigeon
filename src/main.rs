@@ -32,7 +32,7 @@ async fn main() -> anyhow::Result<()> {
     let mut app = App::new(config).unwrap();
     match cli.command {
         Command::Poll => app.poll().await.unwrap(),
-        Command::Push => {}
+        Command::Push => app.push().await.unwrap(),
         Command::Info => app.info().unwrap(),
     }
     Ok(())
