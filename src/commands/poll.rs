@@ -93,7 +93,8 @@ impl Poll {
         let user_id = user_map.get(config.username.as_str()).unwrap();
         UrlBuilder::new(user_id)
             .tweet_fields(vec!["created_at"])
-            .max_results(config.max_results)
+            // Set default `max_results` value: 100.
+            .max_results(config.max_results.unwrap_or(100))
             .start_time(config.start_time.as_deref())
             .end_time(config.end_time.as_deref())
             .build()

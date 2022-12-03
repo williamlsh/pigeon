@@ -1,7 +1,7 @@
 mod timeline;
-mod user;
+mod users;
 
-pub(crate) use user::Users;
+pub(crate) use users::Users;
 pub(crate) use timeline::{Timeline, UrlBuilder, PaginationToken, Data as Tweet};
 
 const API_ENDPOINT_BASE: &str = "https://api.twitter.com/2/";
