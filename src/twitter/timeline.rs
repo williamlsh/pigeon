@@ -169,13 +169,10 @@ impl UrlBuilder {
         self
     }
 
-    pub(crate) fn max_results(mut self, max_results: Option<u8>) -> Self {
-        // Set default value: 100.
-        if let Some(max_results) = max_results.or(Some(100)) {
-            self.0
-                .query_pairs_mut()
-                .append_pair("max_results", &max_results.to_string());
-        }
+    pub(crate) fn max_results(mut self, max_results: u8) -> Self {
+        self.0
+            .query_pairs_mut()
+            .append_pair("max_results", &max_results.to_string());
         self
     }
 
@@ -222,7 +219,7 @@ mod tests {
     fn url_queries() {
         let url = UrlBuilder::new("")
             .tweet_fields(vec!["created_at"])
-            .max_results(Some(100))
+            .max_results(100)
             .start_time(Some("2022-11-21T12:23:43.812Z"))
             .end_time(Some("2022-11-24T12:23:43.812Z"))
             .build();
@@ -302,7 +299,7 @@ mod tests {
         let client = Client::new();
         let endpoint = UrlBuilder::new("2244994945")
             .tweet_fields(vec!["created_at"])
-            .max_results(Some(10))
+            .max_results(10)
             .start_time(Some("2022-10-25T00:00:00.000Z"))
             .end_time(Some("2022-11-04T00:00:00.000Z"))
             .build();
