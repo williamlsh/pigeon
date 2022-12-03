@@ -36,7 +36,7 @@ impl Poll {
             let start_time = Self::fetch_state(database, &cfg.username)?;
             // Note: `start_time` in poll config has higher priority than that in persistent state.
             cfg.insert_start_time(start_time);
-            info!("Poll timeline with config: {:?}", cfg);
+            info!("Polling timeline with config: {:?}", cfg);
 
             let endpoint = Self::endpoint(cfg, &user_map);
             // Note: `since_id` takes higher priority than `start_time` in request query parameters.
@@ -55,6 +55,7 @@ impl Poll {
                 Self::insert_tweet(database, &cfg.username, &tweet)?;
             }
         }
+        info!("Finished polling all timeline.");
         Ok(())
     }
 

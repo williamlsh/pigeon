@@ -52,7 +52,7 @@ impl<'a> Timeline<'a> {
                 0 => self.url.clone(),
                 // The last request.
                 n => {
-                    info!("Timeline poll finished, total pages: {}", n);
+                    info!("Finished polling timeline, total pages: {}", n);
                     return Ok(None);
                 }
             },
@@ -96,9 +96,8 @@ impl<'a> Timeline<'a> {
             }
             StatusCode::TOO_MANY_REQUESTS => {
                 info!(
-                "twitter timeline endpoint rate limit reached, please wait for at least 15 mins: {}",
-                response.status()
-            );
+                "twitter timeline endpoint rate limit reached, please wait for at least 15 mins before next try: {}",
+                response.status());
                 Ok(None)
             }
             x => {
