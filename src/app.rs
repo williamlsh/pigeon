@@ -4,6 +4,7 @@ use crate::{
     database::Database,
     Config,
 };
+use log::info;
 use reqwest::Client;
 
 /// Application entry.
@@ -25,18 +26,21 @@ impl App {
     }
 
     pub async fn poll(&mut self) -> Result<(), String> {
+        info!("Starting to poll Twitter timeline from config.");
         Poll::new(self.config.twitter_token.take(), self.poll_config()?)?
             .run(&self.client, &self.database)
             .await
     }
 
     pub async fn push(&mut self) -> Result<(), String> {
+        info!("Starting to push timeline to Telegram channel(s) from config.");
         Push::new(self.config.telegram_token.take(), self.push_config()?)?
             .run(&self.client, &mut self.database)
             .await
     }
 
     pub fn info(&self) -> Result<(), String> {
+        info!("Overview info of database.");
         info(&self.database).map_err(|err| format!("Error displaying database data: {:?}", err))
     }
 
