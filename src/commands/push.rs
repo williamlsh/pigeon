@@ -60,7 +60,7 @@ impl Push {
             };
             if let Some(telegram_channel) = user_map.get(twitter_username) {
                 let message = Message {
-                    chat_id: telegram_channel.to_string(),
+                    chat_id: format!("@{}", telegram_channel),
                     text: tweet.text,
                 };
                 let response = message.send(client, &self.telegram_token).await?;
