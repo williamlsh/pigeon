@@ -1,4 +1,4 @@
-use log::{info, warn};
+use log::{debug, info, warn};
 use reqwest::{Client, StatusCode};
 use std::{collections::HashMap, str, time::Duration};
 use tokio::time;
@@ -58,7 +58,9 @@ impl Push {
                 let (twitter_username, _) = key_str.split_once(':').unwrap();
                 (twitter_username, tweet)
             };
+            debug!("Read {}'s tweet.", twitter_username);
             if let Some(telegram_channel) = user_map.get(twitter_username) {
+                debug!("Push tweet to {}", telegram_channel);
                 let message = Message {
                     chat_id: format!("@{}", telegram_channel),
                     text: tweet.text,
