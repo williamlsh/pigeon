@@ -86,7 +86,10 @@ impl Push {
             (Some(first_entry), Some(last_entry)) => {
                 database.delete_range_cf("timeline", first_entry, last_entry)
             }
-            (Some(_), None) => database.drop_cf("timeline"),
+            (Some(_), None) => {
+                info!("Finished pushing all timeline.");
+                database.drop_cf("timeline")
+            }
             _ => {
                 info!("No tweets to push.");
                 Ok(())
