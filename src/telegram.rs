@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use reqwest::{Client, Response};
 use serde::Serialize;
 use url::Url;
@@ -12,24 +13,22 @@ pub(crate) struct Message {
 }
 
 impl Message {
-   pub(crate) async fn send(&self, client: &Client, telegram_token: &str) -> Result<Response, String> {
-        client
+    pub(crate) async fn send(&self, client: &Client, telegram_token: &str) -> Result<Response> {
+        Ok(client
             .post(endpoint(telegram_token)?)
             .json(self)
             .send()
-            .await
-            .map_err(|err| format!("Error sending post request: {:?}", err))
+            .await?)
     }
 }
 
 /// An endpoint for sending messages by Telegram bot.
 /// See: https://core.telegram.org/bots/api#sendmessage
-fn endpoint(token: &str) -> Result<Url, String> {
+fn endpoint(token: &str) -> Result<Url> {
     let api = Url::parse("https://api.telegram.org/")
-        .map_err(|error| format!("could not parse telegram api base endpoint: {}", error))?;
-    let url = Url::options()
+        .with_context(|| "Could not parse Telegram api base endpoint")?;
+    Url::options()
         .base_url(Some(&api))
         .parse(format!("/bot{token}/sendMessage").as_str())
-        .map_err(|error| format!("could not parse path :{}", error))?;
-    Ok(url)
+        .with_context(|| "could not parse Telegram api path")
 }

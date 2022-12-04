@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use log::{info, trace, warn};
 use reqwest::Client;
 use reqwest::StatusCode;
@@ -39,7 +40,7 @@ impl<'a> Timeline<'a> {
         }
     }
 
-    pub(crate) async fn try_next(&mut self) -> Result<Option<Data>, String> {
+    pub(crate) async fn try_next(&mut self) -> Result<Option<Data>> {
         if let Some(text) = self.texts.next() {
             return Ok(Some(text));
         }
@@ -64,14 +65,14 @@ impl<'a> Timeline<'a> {
             .bearer_auth(self.auth_token)
             .send()
             .await
-            .map_err(|error| format!("request timeline failed: {:?}", error))?;
+            .with_context(|| "Failed to request timeline")?;
         // Check response status.
         match response.status() {
             StatusCode::OK => {
                 let mut timeline: Tweets = response
                     .json()
                     .await
-                    .map_err(|error| format!("could not deserialize json response: {:?}", error))?;
+                    .with_context(|| "Failed to deserialize json response")?;
                 trace!("got timeline: {:?}", timeline);
 
                 // Keep the pagination token for next request.
@@ -153,13 +154,13 @@ struct Meta {
 pub(crate) struct UrlBuilder(Url);
 
 impl UrlBuilder {
-    pub(crate) fn new(user_id: &str) -> Self {
+    pub(crate) fn new(user_id: &str) -> Result<Self> {
         let base_url = Url::parse(API_ENDPOINT_BASE).unwrap();
-        let url = Url::options()
+        Url::options()
             .base_url(Some(&base_url))
             .parse(format!("users/{}/tweets", user_id).as_str())
-            .expect("could not parse url form user_id segment");
-        Self(url)
+            .map(Self)
+            .with_context(|| "Failed to parse url from user_id segment")
     }
 
     pub(crate) fn tweet_fields(mut self, tweet_fields: Vec<&str>) -> Self {
@@ -208,7 +209,7 @@ mod tests {
 
     #[test]
     fn build_url() {
-        let url = UrlBuilder::new("123").build();
+        let url = UrlBuilder::new("123").unwrap().build();
         assert_eq!(
             format!("{}users/{}/tweets", API_ENDPOINT_BASE, "123"),
             url.as_str()
@@ -218,6 +219,7 @@ mod tests {
     #[test]
     fn url_queries() {
         let url = UrlBuilder::new("")
+            .unwrap()
             .tweet_fields(vec!["created_at"])
             .max_results(100)
             .start_time(Some("2022-11-21T12:23:43.812Z"))
@@ -298,6 +300,7 @@ mod tests {
 
         let client = Client::new();
         let endpoint = UrlBuilder::new("2244994945")
+            .unwrap()
             .tweet_fields(vec!["created_at"])
             .max_results(10)
             .start_time(Some("2022-10-25T00:00:00.000Z"))

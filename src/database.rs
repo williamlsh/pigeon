@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Context, Result};
 use rocksdb::{ColumnFamilyDescriptor, DBIterator, IteratorMode, Options, DB};
 use std::path::Path;
 
@@ -19,34 +20,24 @@ impl Database {
         Self(db)
     }
 
-    pub(crate) fn put_cf<K, V>(&self, cf: &str, key: K, value: V) -> Result<(), String>
+    pub(crate) fn put_cf<K, V>(&self, cf: &str, key: K, value: V) -> Result<()>
     where
         K: AsRef<[u8]>,
         V: AsRef<[u8]>,
     {
         match self.0.cf_handle(cf) {
-            Some(cf_handle) => self
-                .0
-                .put_cf(cf_handle, key, value)
-                .map_err(|error| format!("could not put data into rocksdb: {:?}", error)),
-            None => Err(format!("no such column family: {}", cf)),
+            Some(cf_handle) => Ok(self.0.put_cf(cf_handle, key, value)?),
+            None => Err(anyhow!("no such column family: {}", cf)),
         }
     }
 
-    pub(crate) fn get_cf<K: AsRef<[u8]>>(
-        &self,
-        cf: &str,
-        key: K,
-    ) -> Result<Option<Vec<u8>>, String> {
+    pub(crate) fn get_cf<K: AsRef<[u8]>>(&self, cf: &str, key: K) -> Result<Option<Vec<u8>>> {
         match self.0.cf_handle(cf) {
-            Some(cf_handle) => match self.0.get_cf(cf_handle, key) {
-                Ok(value) => Ok(value),
-                Err(error) => Err(format!(
-                    "could not get value from column family: {:?}",
-                    error
-                )),
-            },
-            None => Err(format!("no such column family: {}", cf)),
+            Some(cf_handle) => self
+                .0
+                .get_cf(cf_handle, key)
+                .with_context(|| "could not get value from column family"),
+            None => Err(anyhow!("no such column family: {}", cf)),
         }
     }
 
@@ -57,23 +48,18 @@ impl Database {
     }
 
     /// Performs an `from` inclusive but `to` exclusive range (`["from", "to")`) deletion.
-    pub(crate) fn delete_range_cf<K>(&self, cf: &str, from: K, to: K) -> Result<(), String>
+    pub(crate) fn delete_range_cf<K>(&self, cf: &str, from: K, to: K) -> Result<()>
     where
         K: AsRef<[u8]>,
     {
         match self.0.cf_handle(cf) {
-            Some(cf_handle) => self
-                .0
-                .delete_range_cf(cf_handle, from, to)
-                .map_err(|err| format!("could not delete entries range: {:?}", err)),
-            None => Err(format!("no such column family: {}", cf)),
+            Some(cf_handle) => Ok(self.0.delete_range_cf(cf_handle, from, to)?),
+            None => Err(anyhow!("no such column family: {}", cf)),
         }
     }
 
-    pub(crate) fn drop_cf(&mut self, cf: &str) -> Result<(), String> {
-        self.0
-            .drop_cf(cf)
-            .map_err(|err| format!("could not drop column family {}: {:?}", cf, err))
+    pub(crate) fn drop_cf(&mut self, cf: &str) -> Result<()> {
+        Ok(self.0.drop_cf(cf)?)
     }
 }
 

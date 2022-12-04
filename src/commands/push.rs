@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Context, Result};
 use log::{debug, info, warn};
 use reqwest::{Client, StatusCode};
 use std::{collections::HashMap, str, time::Duration};
@@ -21,11 +22,8 @@ pub(crate) struct Push {
 }
 
 impl Push {
-    pub(crate) fn new(
-        telegram_token: Option<String>,
-        config: Vec<PushConfig>,
-    ) -> Result<Self, String> {
-        let telegram_token = telegram_token.ok_or("Empty Telegram token")?;
+    pub(crate) fn new(telegram_token: Option<String>, config: Vec<PushConfig>) -> Result<Self> {
+        let telegram_token = telegram_token.ok_or_else(|| anyhow!("Empty Telegram token"))?;
         Ok(Self {
             telegram_token,
             config,
@@ -34,11 +32,7 @@ impl Push {
         })
     }
 
-    pub(crate) async fn run(
-        &mut self,
-        client: &Client,
-        database: &mut Database,
-    ) -> Result<(), String> {
+    pub(crate) async fn run(&mut self, client: &Client, database: &mut Database) -> Result<()> {
         let user_map = self.user_map();
         // Read timeline column family from database.
         // Note: we're sure there's a timeline iterator, so just unwrap it directly.
@@ -50,10 +44,8 @@ impl Push {
             }
 
             let (twitter_username, tweet) = {
-                let key_str = str::from_utf8(&key)
-                    .map_err(|err| format!("could not convert string from bytes: {:?}", err))?;
-                let tweet: Tweet = serde_json::from_slice(&value)
-                    .map_err(|err| format!("could not decode data from bytes: {:?}", err))?;
+                let key_str = str::from_utf8(&key)?;
+                let tweet: Tweet = serde_json::from_slice(&value)?;
                 // Unwrap it directly since we're sure it's Some(&str).
                 let (twitter_username, _) = key_str.split_once(':').unwrap();
                 (twitter_username, tweet)
@@ -65,7 +57,10 @@ impl Push {
                     chat_id: format!("@{}", telegram_channel),
                     text: tweet.text,
                 };
-                let response = message.send(client, &self.telegram_token).await?;
+                let response = message
+                    .send(client, &self.telegram_token)
+                    .await
+                    .with_context(|| "Failed to send message to Telegram channel")?;
                 match response.status() {
                     // Note: Telegram bot api applies requests rate limit.
                     StatusCode::OK => time::sleep(Duration::from_secs(3)).await,
