@@ -1,5 +1,7 @@
-use crate::{database::Database, twitter::Tweet};
 use std::str;
+use tabled::{Table, Tabled};
+
+use crate::{database::Database, twitter::Tweet};
 
 pub(crate) fn info(database: &Database) -> anyhow::Result<()> {
     display_state(database)?;
@@ -8,28 +10,37 @@ pub(crate) fn info(database: &Database) -> anyhow::Result<()> {
 
 fn display_state(database: &Database) -> anyhow::Result<()> {
     println!("Data in column family state:");
-    if let Some(state) = database.iterator_cf("state") {
-        for entry in state {
-            let (key, value) = entry?;
-            let key_str = str::from_utf8(&key)?;
-            let value_str = str::from_utf8(&value)?;
-            println!("{} = {}", key_str, value_str);
-        }
+    let mut overview = vec![];
+    for entry in database.iterator_cf("state").unwrap() {
+        let (key, value) = entry?;
+        let key_str = str::from_utf8(&key)?;
+        let value_str = str::from_utf8(&value)?;
+        overview.push(StateInfo {
+            twitter_username: key_str.into(),
+            last_tweet_datetime: value_str.into(),
+        });
     }
+    println!("{}", Table::new(overview));
     Ok(())
 }
 
 fn display_timeline(database: &Database) -> anyhow::Result<()> {
-    println!("Data in column family timeline:");
-    if let Some(timeline) = database.iterator_cf("timeline") {
-        for entry in timeline {
-            let (key, value) = entry?;
-            let key_str = str::from_utf8(&key)?;
-            let value_str: Tweet = serde_json::from_slice(&value)?;
-            println!("{} = {:?}", key_str, value_str);
-        }
+    // Start with en empty line.
+    println!("\nData in column family timeline:");
+    let timeline = database.iterator_cf("timeline").unwrap();
+    for entry in timeline {
+        let (key, value) = entry?;
+        let key_str = str::from_utf8(&key)?;
+        let value_str: Tweet = serde_json::from_slice(&value)?;
+        println!("  {} = {:?}", key_str, value_str);
     }
     Ok(())
+}
+
+#[derive(Tabled)]
+struct StateInfo {
+    twitter_username: String,
+    last_tweet_datetime: String,
 }
 
 #[cfg(test)]
