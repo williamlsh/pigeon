@@ -3,13 +3,15 @@ twitter_token = "xxx"    # Twitter API token
 telegram_token = "xxx"   # Telegram Bot API token
 
 # Poll Twitter timeline from user(s)
+# Note: `start_time` and `end_time` only need to be specified at the first time running,
+# every other time running Pigeon will continue from the last time which it remembers form Rocksdb.
 [[poll]]
 included = true                         # Whether this user is included for polling
 username = "TwitterDev"                 # Twitter username
-max_results = 5                         # Max results per page of timeline
-start_time = "2022-10-25T00:00:00.000Z" # Start time of timeline to poll
-end_time = "2022-11-01T00:00:00.000Z"   # End time of timeline to poll
-since_id = "xyz"                        # Tweet id to continue to poll
+max_results = 5                         # Max results per page of timeline, optioanl, default to 100
+start_time = "2022-10-25T00:00:00.000Z" # Start time of timeline to poll, optioanl, default to oldest time
+end_time = "2022-11-01T00:00:00.000Z"   # End time of timeline to poll, optioanl, default ot present time
+since_id = "xyz"                        # Tweet id to continue to poll, optioanl
 
 # Push polled data to Telegram channel(s)
 [[push]]
