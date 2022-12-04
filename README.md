@@ -1,53 +1,65 @@
 # Pigeon
 
-Tweets in sync with Telegram channel.
+A convenient tool to sync Tweets to Telegram channel(s) written in pure Rust.
 
 ## Features
 
-- Archive Twitter users' timeline.
-- Store and export timeline data in and from RocksDB.
-- Sync timeline tweets with Telegram channel.
+- Poll Twitter users' timeline.
+- Store and display timeline data in and from RocksDB.
+- Push timeline tweets to Telegram channel(s).
+
+## How to configure?
+
+See [config.toml](config.toml) for example.
 
 ## How to use
 
-General commands with options:
+Build binary:
 
 ```
-$ cargo run -- --help
-
-pigeon 0.1.4
-
-USAGE:
-    pigeon <SUBCOMMAND>
-
-OPTIONS:
-    -h, --help       Print help information
-    -V, --version    Print version information
-
-SUBCOMMANDS:
-    archive    Archive users' Twitter timeline raw data to RocksDB
-    export     Export all raw data from RocksDB
-    help       Print this message or the help of the given subcommand(s)
-    poll       Poll Timeline since latest archived tweet
-    sync       Sync tweets extracted from RocksDB raw timeline data to Telegram channel
+cargo build --release
 ```
 
-You can also use targets predefined in `justfile`.
-
-Make sure you have [just](https://github.com/casey/just#installation) installed in your machine.
-
-Prepare a `.env` file with environments below:
+General commands:
 
 ```
-TWITTER_API_TOKEN=<your twitter api token>
-TELEGRAM_BOT_API_TOKEN=<your Telegram bot api token>
-ROCKSDB_PATH=<RocksDB path>
-TWITTER_USERNAMES=<your target Twitter usernames>
-CHANNEL_USERNAMES=<your target Telegram channel usernames>
+$ target/release/pigeon --help
+
+Usage: pigeon --config-path <config.toml> <COMMAND>
+
+Commands:
+  poll  Poll Twitter users' timeline
+  push  Push timeline to Telegram channel(s)
+  info  Display overview information about Database
+  help  Print this message or the help of the given subcommand(s)
+
+Options:
+  -c, --config-path <config.toml>  Config file path
+  -h, --help                       Print help information
 ```
 
-For example, to archive users' timeline:
+You can also use a [Pigeon](https://github.com/users/williamlsh/packages/container/package/pigeon) Docker image.
+
+## Proxy
+
+You can specify HTTP/HTTPS or Socks5 proxy for all network connections from Pigeon through environment variables. For instance:
+
+To use an HTTP proxy:
 
 ```
-just archive
+export HTTP_PROXY=http://secure.example
 ```
+
+Or to use an Socks5 proxy:
+
+```
+export https_proxy=socks5://127.0.0.1:1086
+```
+
+## Local data
+
+All tweets data is stored in RocksDB in a local path that you specified when running Pigeon. Tweets that are pushed to Telegram channel(s) will automatically be deleted. No garbage data will remain in your disk storage.
+
+## Author
+
+* [William](https://github.com/williamlsh)
