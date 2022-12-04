@@ -41,55 +41,56 @@ impl Push {
     ) -> Result<(), String> {
         let user_map = self.user_map();
         // Read timeline column family from database.
-        if let Some(timeline) = database.iterator_cf("timeline") {
-            for (i, entry) in timeline.enumerate() {
-                let (key, value) = entry?;
-                if i == 0 {
-                    // Keep the first entry key.
-                    self.first_entry = Some(key.clone());
-                }
+        // Note: we're sure there's a timeline iterator, so just unwrap it directly.
+        for (i, entry) in database.iterator_cf("timeline").unwrap().enumerate() {
+            let (key, value) = entry?;
+            if i == 0 {
+                // Keep the first entry key.
+                self.first_entry = Some(key.clone());
+            }
 
-                let (twitter_username, tweet) = {
-                    let key_str = str::from_utf8(&key)
-                        .map_err(|err| format!("could not convert string from bytes: {:?}", err))?;
-                    let tweet: Tweet = serde_json::from_slice(&value)
-                        .map_err(|err| format!("could not decode data from bytes: {:?}", err))?;
-                    // Unwrap it directly since we're sure it's Some(&str).
-                    let (twitter_username, _) = key_str.split_once(':').unwrap();
-                    (twitter_username, tweet)
+            let (twitter_username, tweet) = {
+                let key_str = str::from_utf8(&key)
+                    .map_err(|err| format!("could not convert string from bytes: {:?}", err))?;
+                let tweet: Tweet = serde_json::from_slice(&value)
+                    .map_err(|err| format!("could not decode data from bytes: {:?}", err))?;
+                // Unwrap it directly since we're sure it's Some(&str).
+                let (twitter_username, _) = key_str.split_once(':').unwrap();
+                (twitter_username, tweet)
+            };
+            if let Some(telegram_channel) = user_map.get(twitter_username) {
+                let message = Message {
+                    chat_id: telegram_channel.to_string(),
+                    text: tweet.text,
                 };
-                if let Some(telegram_channel) = user_map.get(twitter_username) {
-                    let message = Message {
-                        chat_id: telegram_channel.to_string(),
-                        text: tweet.text,
-                    };
-                    let response = message.send(client, &self.telegram_token).await?;
-                    match response.status() {
-                        // Note: Telegram bot api applies requests rate limit.
-                        StatusCode::OK => time::sleep(Duration::from_secs(3)).await,
-                        other => {
-                            warn!(
-                                "request not successful, got response status: {} and body: {}",
-                                other,
-                                response.text().await.unwrap_or_else(|_| "".to_string())
-                            );
-                            info!("Stop pushing and deleting pushed tweets in database.");
-                            // Keep the last entry key.
-                            self.last_entry = Some(key);
-                            break;
-                        }
+                let response = message.send(client, &self.telegram_token).await?;
+                match response.status() {
+                    // Note: Telegram bot api applies requests rate limit.
+                    StatusCode::OK => time::sleep(Duration::from_secs(3)).await,
+                    other => {
+                        warn!(
+                            "request not successful, got response status: {} and body: {}",
+                            other,
+                            response.text().await.unwrap_or_else(|_| "".to_string())
+                        );
+                        info!("Stop pushing and deleting pushed tweets in database.");
+                        // Keep the last entry key.
+                        self.last_entry = Some(key);
+                        break;
                     }
                 }
             }
         }
-        if let (Some(entry_start), Some(entry_end)) =
-            (self.first_entry.take(), self.last_entry.take())
-        {
-            // Delete pushed data from database.
-            database.delete_range_cf("timeline", entry_start, entry_end)
-        } else {
-            // Delete timeline column family after reading and pushing to Telegram channel.
-            database.drop_cf("timeline")
+        // Tidy database.
+        match (self.first_entry.take(), self.last_entry.take()) {
+            (Some(first_entry), Some(last_entry)) => {
+                database.delete_range_cf("timeline", first_entry, last_entry)
+            }
+            (Some(_), None) => database.drop_cf("timeline"),
+            _ => {
+                info!("No tweets to push.");
+                Ok(())
+            }
         }
     }
 
