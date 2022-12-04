@@ -29,11 +29,11 @@ async fn main() -> anyhow::Result<()> {
 
     let cli = Cli::parse();
     let config = load_config(cli.config_path).await?;
-    let mut app = App::new(config).unwrap();
+    let mut app = App::new(config);
     match cli.command {
-        Command::Poll => app.poll().await.unwrap(),
-        Command::Push => app.push().await.unwrap(),
-        Command::Info => app.info().unwrap(),
+        Command::Poll => app.poll().await?,
+        Command::Push => app.push().await?,
+        Command::Info => app.info()?,
     }
     Ok(())
 }

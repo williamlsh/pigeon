@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use log::warn;
 use reqwest::Client;
 use serde::Deserialize;
@@ -38,18 +39,18 @@ impl Users {
         client: &Client,
         usernames: Vec<&str>,
         auth_token: &str,
-    ) -> Result<Option<HashMap<String, String>>, String> {
+    ) -> Result<Option<HashMap<String, String>>> {
         let endpoint = Self::endpoint(usernames)?;
         Self::send_request(client, endpoint, auth_token).await
     }
 
-    fn endpoint(usernames: Vec<&str>) -> Result<Url, String> {
+    fn endpoint(usernames: Vec<&str>) -> Result<Url> {
         let base_url = Url::parse(API_ENDPOINT_BASE).unwrap();
         let usernames = usernames.join(",");
         let mut url = Url::options()
             .base_url(Some(&base_url))
             .parse("users/by")
-            .map_err(|error| format!("could not parse user lookup endpoint: {:?}", error))?;
+            .with_context(|| "Failed to parse users look up endpoint")?;
         url.set_query(Some(format!("usernames={}", usernames).as_str()));
 
         Ok(url)
@@ -59,13 +60,13 @@ impl Users {
         client: &Client,
         endpoint: Url,
         auth_token: &str,
-    ) -> Result<Option<HashMap<String, String>>, String> {
+    ) -> Result<Option<HashMap<String, String>>> {
         let response = client
             .get(endpoint)
             .bearer_auth(auth_token)
             .send()
             .await
-            .map_err(|error| format!("get request failed: {:?}", error))?;
+            .with_context(|| "Request failed to get users")?;
         if !response.status().is_success() {
             warn!(
                 "request not successful, got response status: {}",
@@ -77,7 +78,7 @@ impl Users {
         let users: Users = response
             .json()
             .await
-            .map_err(|error| format!("could not deserialize json response: {:?}", error))?;
+            .with_context(|| "Failed to deserialize json response")?;
         if users.errors.is_some() {
             warn!(
                 "Errors occurred when requesting users: {:#?}",

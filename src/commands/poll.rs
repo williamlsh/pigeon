@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, Duration};
 use log::{info, trace};
 use reqwest::Client;
@@ -17,18 +18,15 @@ pub(crate) struct Poll {
 }
 
 impl Poll {
-    pub(crate) fn new(
-        twitter_token: Option<String>,
-        poll_config: Vec<PollConfig>,
-    ) -> Result<Self, String> {
-        let twitter_token = twitter_token.ok_or("Empty twitter token")?;
+    pub(crate) fn new(twitter_token: Option<String>, poll_config: Vec<PollConfig>) -> Result<Self> {
+        let twitter_token = twitter_token.ok_or_else(|| anyhow!("Empty twitter token"))?;
         Ok(Self {
             twitter_token,
             config: poll_config,
         })
     }
 
-    pub(crate) async fn run(&mut self, client: &Client, database: &Database) -> Result<(), String> {
+    pub(crate) async fn run(&mut self, client: &Client, database: &Database) -> Result<()> {
         let user_map = self.user_map(client).await?;
 
         // Loop Twitter users in poll configs.
@@ -38,7 +36,7 @@ impl Poll {
             cfg.insert_start_time(start_time);
             info!("Polling timeline with config: {:?}", cfg);
 
-            let endpoint = Self::endpoint(cfg, &user_map);
+            let endpoint = Self::endpoint(cfg, &user_map)?;
             // Note: `since_id` takes higher priority than `start_time` in request query parameters.
             let since_id = cfg.since_id.take().map(PaginationToken::TweetID);
             let mut timeline = Timeline::new(client, endpoint, &self.twitter_token, since_id);
@@ -62,12 +60,10 @@ impl Poll {
     // Gets `create_at` of a latest tweet in persistent state, then adds one second to it
     // to be used as `start_time` in timeline request query. This is necessary to deduplicate
     // a tweet when polling.
-    fn fetch_state(database: &Database, username: &str) -> Result<Option<String>, String> {
+    fn fetch_state(database: &Database, username: &str) -> Result<Option<String>> {
         if let Some(value) = database.get_cf("state", username)? {
-            let value_str = str::from_utf8(&value)
-                .map_err(|err| format!("could not convert string from bytes: {:?}", err))?;
-            Ok(DateTime::parse_from_rfc3339(value_str)
-                .map_err(|err| format!("could not parse date time from string: {:?}", err))?
+            let value_str = str::from_utf8(&value)?;
+            Ok(DateTime::parse_from_rfc3339(value_str)?
                 .checked_add_signed(Duration::seconds(1))
                 .map(|datetime| datetime.to_rfc3339()))
         } else {
@@ -75,33 +71,33 @@ impl Poll {
         }
     }
 
-    fn upsert_state(database: &Database, username: &str, created_at: &str) -> Result<(), String> {
+    fn upsert_state(database: &Database, username: &str, created_at: &str) -> Result<()> {
         trace!("Upsert state: key: {}, value: {}", username, created_at);
         database.put_cf("state", username, created_at)
     }
 
-    fn insert_tweet(database: &Database, username: &str, tweet: &Tweet) -> Result<(), String> {
+    fn insert_tweet(database: &Database, username: &str, tweet: &Tweet) -> Result<()> {
         let key = format!("{}:{}", username, tweet.id);
-        let value = serde_json::to_vec(&tweet)
-            .map_err(|err| format!("could not serialize tweet data to json: {:?}", err))?;
+        let value =
+            serde_json::to_vec(&tweet).with_context(|| "could not serialize tweet data to json")?;
         trace!("Insert tweet: key: {}, value: {:?}", key, tweet);
         database.put_cf("timeline", key, value)
     }
 
-    fn endpoint(config: &PollConfig, user_map: &HashMap<String, String>) -> Url {
+    fn endpoint(config: &PollConfig, user_map: &HashMap<String, String>) -> Result<Url> {
         // Unwrap it directly since we are sure it's not None.
         let user_id = user_map.get(config.username.as_str()).unwrap();
-        UrlBuilder::new(user_id)
+        Ok(UrlBuilder::new(user_id)?
             .tweet_fields(vec!["created_at"])
             // Set default `max_results` value: 100.
             .max_results(config.max_results.unwrap_or(100))
             .start_time(config.start_time.as_deref())
             .end_time(config.end_time.as_deref())
-            .build()
+            .build())
     }
 
     /// Returns a username to user_id map.
-    async fn user_map(&self, client: &Client) -> Result<HashMap<String, String>, String> {
+    async fn user_map(&self, client: &Client) -> Result<HashMap<String, String>> {
         let usernames = self
             .config
             .iter()
@@ -109,7 +105,7 @@ impl Poll {
             .collect();
         Users::fetch(client, usernames, &self.twitter_token)
             .await?
-            .ok_or_else(|| "No Twitter users found".into())
+            .ok_or_else(|| anyhow!("No Twitter users found"))
     }
 }
 
