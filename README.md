@@ -38,7 +38,7 @@ Options:
   -h, --help                       Print help information
 ```
 
-You can also use a [Pigeon](https://github.com/users/williamlsh/packages/container/package/pigeon) Docker image.
+You can also download pre-built binary from latest [release](https://github.com/williamlsh/pigeon/releases) or use a [Pigeon](https://github.com/users/williamlsh/packages/container/package/pigeon) Docker image instead.
 
 ## Proxy
 
@@ -62,4 +62,4 @@ All tweets data is stored in RocksDB in a local path that you specified when run
 
 ## Author
 
-* [William](https://github.com/williamlsh)
+- [William](https://github.com/williamlsh)
