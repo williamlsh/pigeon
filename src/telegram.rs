@@ -3,16 +3,25 @@ use reqwest::{Client, Response};
 use serde::Serialize;
 use url::Url;
 
+use crate::twitter::Tweet;
+
 /// A message sent by Telegram bot.
 #[derive(Debug, Serialize)]
 pub(crate) struct Message {
     /// Telegram channel username.
-    pub(crate) chat_id: String,
+    chat_id: String,
     /// Message text body.
-    pub(crate) text: String,
+    text: String,
 }
 
 impl Message {
+    pub(crate) fn new(channel: &str, tweet: Tweet) -> Self {
+        Self {
+            chat_id: format!("@{}", channel),
+            text: format!("{}\n\n{}", tweet.text, tweet.created_at),
+        }
+    }
+
     pub(crate) async fn send(&self, client: &Client, telegram_token: &str) -> Result<Response> {
         Ok(client
             .post(endpoint(telegram_token)?)

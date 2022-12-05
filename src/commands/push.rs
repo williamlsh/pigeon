@@ -53,11 +53,7 @@ impl Push {
             debug!("Read {}'s tweet.", twitter_username);
             if let Some(telegram_channel) = user_map.get(twitter_username) {
                 debug!("Push tweet to {}", telegram_channel);
-                let message = Message {
-                    chat_id: format!("@{}", telegram_channel),
-                    text: format!("{}\n\n{}", tweet.text, tweet.created_at),
-                };
-                let response = message
+                let response = Message::new(telegram_channel, tweet)
                     .send(client, &self.telegram_token)
                     .await
                     .with_context(|| "Failed to send message to Telegram channel")?;

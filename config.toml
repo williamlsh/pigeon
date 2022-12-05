@@ -3,8 +3,8 @@ twitter_token = "xxx"    # Twitter API token
 telegram_token = "xxx"   # Telegram Bot API token
 
 # Poll Twitter timeline from user(s)
-# Note: `start_time` and `end_time` only need to be specified at the first time running,
-# every other time running Pigeon will continue from the last time which it remembers form Rocksdb.
+# Note: Pigeon uses `start_time` and `end_time` when it runs for the first time.
+# After the first time, it will continue from the last time state which it remembers from RocksDB.
 [[poll]]
 included = true                         # Whether this user is included for polling
 username = "TwitterDev"                 # Twitter username

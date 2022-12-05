@@ -32,7 +32,7 @@ impl Poll {
         // Loop Twitter users in poll configs.
         for cfg in &mut self.config {
             let start_time = Self::fetch_state(database, &cfg.username)?;
-            // Note: `start_time` in poll config has higher priority than that in persistent state.
+            // Note: `start_time` in persistent state has higher priority than that in poll config.
             cfg.insert_start_time(start_time);
             info!("Polling timeline with config: {:?}", cfg);
 

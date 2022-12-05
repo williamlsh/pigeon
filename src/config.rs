@@ -1,3 +1,5 @@
+use anyhow::Result;
+use chrono::{DateTime, FixedOffset};
 use serde::Deserialize;
 use std::path::PathBuf;
 
@@ -29,7 +31,7 @@ pub(crate) struct PushConfig {
 
 impl PollConfig {
     pub(crate) fn insert_start_time(&mut self, start_time: Option<String>) {
-        start_time.map(|start_time| self.start_time.get_or_insert(start_time));
+        start_time.map(|start_time| self.start_time.insert(start_time));
     }
 }
 
