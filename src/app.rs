@@ -28,18 +28,28 @@ impl App {
 
     pub async fn poll(&mut self) -> Result<()> {
         info!("Starting to poll Twitter timeline from config.");
-        Poll::new(self.config.twitter_token.take(), self.poll_config()?)?
-            .run(&self.client, &self.database)
-            .await
-            .with_context(|| "Failed to execute poll command")
+        Poll::new(
+            self.config.twitter_token.take(),
+            self.poll_config()?,
+            &self.client,
+            &self.database,
+        )?
+        .run()
+        .await
+        .with_context(|| "Failed to execute poll command")
     }
 
     pub async fn push(&mut self) -> Result<()> {
         info!("Starting to push timeline to Telegram channel(s) from config.");
-        Push::new(self.config.telegram_token.take(), self.push_config()?)?
-            .run(&self.client, &mut self.database)
-            .await
-            .with_context(|| "Failed to execute push command")
+        Push::new(
+            self.config.telegram_token.take(),
+            self.push_config()?,
+            &self.client,
+            &mut self.database,
+        )?
+        .run()
+        .await
+        .with_context(|| "Failed to execute push command")
     }
 
     pub fn info(&self) -> Result<()> {
@@ -56,6 +66,7 @@ impl App {
             .ok_or_else(|| anyhow!("Empty poll config"))
     }
 
+    /// Returns push configs that are included.
     fn push_config(&mut self) -> Result<Vec<PushConfig>> {
         self.config
             .push

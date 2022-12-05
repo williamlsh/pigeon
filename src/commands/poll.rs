@@ -12,26 +12,35 @@ use crate::{
 };
 
 /// Poll command entry.
-pub(crate) struct Poll {
+pub(crate) struct Poll<'a> {
     twitter_token: String,
     config: Vec<PollConfig>,
+    client: &'a Client,
+    database: &'a Database,
 }
 
-impl Poll {
-    pub(crate) fn new(twitter_token: Option<String>, poll_config: Vec<PollConfig>) -> Result<Self> {
+impl<'a> Poll<'a> {
+    pub(crate) fn new(
+        twitter_token: Option<String>,
+        poll_config: Vec<PollConfig>,
+        client: &'a Client,
+        database: &'a Database,
+    ) -> Result<Self> {
         let twitter_token = twitter_token.ok_or_else(|| anyhow!("Empty twitter token"))?;
         Ok(Self {
             twitter_token,
             config: poll_config,
+            client,
+            database,
         })
     }
 
-    pub(crate) async fn run(&mut self, client: &Client, database: &Database) -> Result<()> {
-        let user_map = self.user_map(client).await?;
+    pub(crate) async fn run(&mut self) -> Result<()> {
+        let user_map = self.user_map(self.client).await?;
 
         // Loop Twitter users in poll configs.
         for cfg in &mut self.config {
-            let start_time = Self::fetch_state(database, &cfg.username)?;
+            let start_time = Self::fetch_state(self.database, &cfg.username)?;
             // Note: `start_time` in persistent state has higher priority than that in poll config.
             cfg.insert_start_time(start_time);
             info!("Polling timeline with config: {:?}", cfg);
@@ -39,18 +48,18 @@ impl Poll {
             let endpoint = Self::endpoint(cfg, &user_map)?;
             // Note: `since_id` takes higher priority than `start_time` in request query parameters.
             let since_id = cfg.since_id.take().map(PaginationToken::TweetID);
-            let mut timeline = Timeline::new(client, endpoint, &self.twitter_token, since_id);
+            let mut timeline = Timeline::new(self.client, endpoint, &self.twitter_token, since_id);
 
             // Poll first tweet. The first tweet is the latest one in timeline.
             // Extract `create_at` from tweet, and upsert it to persistent state.
             // So we can continually poll user's timeline from last time.
             if let Some(tweet) = timeline.try_next().await? {
-                Self::upsert_state(database, &cfg.username, &tweet.created_at)?;
-                Self::insert_tweet(database, &cfg.username, &tweet)?;
+                Self::upsert_state(self.database, &cfg.username, &tweet.created_at)?;
+                Self::insert_tweet(self.database, &cfg.username, &tweet)?;
             }
             // Poll remaining tweets.
             while let Some(tweet) = timeline.try_next().await? {
-                Self::insert_tweet(database, &cfg.username, &tweet)?;
+                Self::insert_tweet(self.database, &cfg.username, &tweet)?;
             }
         }
         info!("Finished polling all timeline.");
@@ -139,8 +148,9 @@ mod tests {
             since_id: None,
         }];
         {
-            let mut poll = Poll::new(auth_token.clone(), poll_config.clone()).unwrap();
-            poll.run(&client, &database).await.unwrap();
+            let mut poll =
+                Poll::new(auth_token.clone(), poll_config.clone(), &client, &database).unwrap();
+            poll.run().await.unwrap();
         }
         {
             // Remove `start_time` and `end_time` fields.
@@ -148,9 +158,9 @@ mod tests {
                 cfg.start_time.take();
                 cfg.end_time.replace("2022-12-01T00:00:00.000Z".into());
             });
-            let mut poll = Poll::new(auth_token, poll_config).unwrap();
+            let mut poll = Poll::new(auth_token, poll_config, &client, &database).unwrap();
             // Poll again from last time.
-            poll.run(&client, &database).await.unwrap();
+            poll.run().await.unwrap();
         }
 
         drop(database);

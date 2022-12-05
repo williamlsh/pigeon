@@ -73,8 +73,8 @@ mod tests {
             since_id: None,
         }];
 
-        let mut poll = Poll::new(auth_token, poll_config).unwrap();
-        poll.run(&client, &database).await.unwrap();
+        let mut poll = Poll::new(auth_token, poll_config, &client, &database).unwrap();
+        poll.run().await.unwrap();
         info(&database).unwrap();
 
         drop(database);
