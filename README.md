@@ -12,6 +12,10 @@ A convenient tool to sync Tweets to Telegram channel(s) written in pure Rust.
 
 See [config.toml](config.toml) for example.
 
+To get a Twitter API token, see: [How to get access to the Twitter API](https://developer.twitter.com/en/docs/twitter-api/getting-started/getting-access-to-the-twitter-api).
+
+To get a Telegram Bot API token, see: [Creating a new bot](https://core.telegram.org/bots/features#creating-a-new-bot).
+
 ## How to use
 
 Build binary:
