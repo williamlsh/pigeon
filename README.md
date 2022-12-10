@@ -28,8 +28,7 @@ General commands:
 
 ```
 $ target/release/pigeon --help
-
-Usage: pigeon --config-path <config.toml> <COMMAND>
+Usage: pigeon [OPTIONS] --config-path <config.toml> <COMMAND>
 
 Commands:
   poll  Poll Twitter users' timeline
@@ -38,6 +37,7 @@ Commands:
   help  Print this message or the help of the given subcommand(s)
 
 Options:
+  -d, --debug                      Activate debug mode
   -c, --config-path <config.toml>  Config file path
   -h, --help                       Print help information
 ```
