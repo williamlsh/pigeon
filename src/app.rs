@@ -5,8 +5,8 @@ use crate::{
     Config,
 };
 use anyhow::{anyhow, Context, Result};
-use log::info;
 use reqwest::Client;
+use tracing::{info, instrument};
 
 /// Application entry.
 pub struct App {
@@ -26,6 +26,7 @@ impl App {
         }
     }
 
+    #[instrument(skip_all)]
     pub async fn poll(&mut self) -> Result<()> {
         info!("Starting to poll Twitter timeline from config.");
         Poll::new(
@@ -39,6 +40,7 @@ impl App {
         .with_context(|| "Failed to execute poll command")
     }
 
+    #[instrument(skip_all)]
     pub async fn push(&mut self) -> Result<()> {
         info!("Starting to push timeline to Telegram channel(s) from config.");
         Push::new(

@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
-use log::{info, trace, warn};
 use reqwest::Client;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
+use tracing::{info, trace, warn};
 use url::Url;
 
 use super::API_ENDPOINT_BASE;
@@ -73,7 +73,7 @@ impl<'a> Timeline<'a> {
                     .json()
                     .await
                     .with_context(|| "Failed to deserialize json response")?;
-                trace!("got timeline: {:?}", timeline);
+                trace!(?timeline);
 
                 // Keep the pagination token for next request.
                 self.pagination_token = timeline
@@ -202,8 +202,8 @@ impl UrlBuilder {
 
 #[cfg(test)]
 mod tests {
-    use log::debug;
     use reqwest::Client;
+    use tracing::debug;
 
     use super::{PaginationToken, Timeline, Tweets, UrlBuilder, API_ENDPOINT_BASE};
 
@@ -290,11 +290,9 @@ mod tests {
 
     // To test this function:
     // RUST_LOG=debug cargo test tweets -- --ignored '[auth_token]'
-    #[tokio::test]
+    #[test_log::test(tokio::test)]
     #[ignore = "require command line input"]
     async fn tweets() {
-        init();
-
         let mut args = std::env::args().rev();
         let auth_token = args.next().unwrap();
 
@@ -311,7 +309,7 @@ mod tests {
             let mut timeline = Timeline::new(&client, endpoint.clone(), &auth_token, None);
 
             while let Some(tweet) = timeline.try_next().await.unwrap() {
-                debug!("{:#?}", tweet);
+                debug!(?tweet);
             }
         }
         {
@@ -319,12 +317,8 @@ mod tests {
             let tweet_id = PaginationToken::TweetID("1586025008899448832".into());
             let mut timeline = Timeline::new(&client, endpoint, &auth_token, Some(tweet_id));
             while let Some(tweet) = timeline.try_next().await.unwrap() {
-                debug!("{:#?}", tweet);
+                debug!(?tweet);
             }
         }
-    }
-
-    fn init() {
-        let _ = env_logger::builder().try_init();
     }
 }

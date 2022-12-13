@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
-use log::warn;
 use reqwest::Client;
 use serde::Deserialize;
 use std::collections::HashMap;
+use tracing::warn;
 use url::Url;
 
 use super::API_ENDPOINT_BASE;
@@ -99,9 +99,9 @@ impl Users {
 
 #[cfg(test)]
 mod tests {
-    use log::debug;
     use reqwest::Client;
     use serde_json::Result;
+    use tracing::debug;
 
     use super::Users;
     use crate::twitter::API_ENDPOINT_BASE;
@@ -148,11 +148,9 @@ mod tests {
 
     // To test this function:
     // RUST_LOG=debug cargo test fetch -- --ignored '[auth_token]' TwitterDev,jack,1ws23x
-    #[tokio::test]
+    #[test_log::test(tokio::test)]
     #[ignore = "require command line input"]
     async fn fetch() {
-        init();
-
         let mut args = std::env::args().rev();
         let arg = args.next().unwrap();
         let usernames = arg.split(',').collect();
@@ -163,11 +161,7 @@ mod tests {
             .await
             .unwrap();
         if let Some(users) = users {
-            debug!("Users: {:#?}", users);
+            debug!(?users);
         }
-    }
-
-    fn init() {
-        let _ = env_logger::builder().try_init();
     }
 }
