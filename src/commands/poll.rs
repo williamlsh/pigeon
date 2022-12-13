@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, Duration};
-use log::{info, trace};
 use reqwest::Client;
 use std::{collections::HashMap, str};
+use tracing::{info, trace};
 use url::Url;
 
 use crate::{
@@ -128,11 +128,9 @@ mod tests {
 
     // To test this function:
     // RUST_LOG=debug cargo test poll -- --ignored '[auth_token]'
-    #[tokio::test]
+    #[test_log::test(tokio::test)]
     #[ignore = "require command line input"]
     async fn poll() {
-        init();
-
         let mut args = std::env::args().rev();
         let auth_token = args.next();
 
@@ -165,9 +163,5 @@ mod tests {
 
         drop(database);
         DB::destroy(&Options::default(), rocksdb_path).unwrap();
-    }
-
-    fn init() {
-        let _ = env_logger::builder().try_init();
     }
 }

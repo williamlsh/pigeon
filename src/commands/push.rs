@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Context, Result};
-use log::{debug, info, warn};
 use reqwest::{Client, StatusCode};
 use std::{collections::HashMap, str, time::Duration};
 use tokio::time;
+use tracing::{debug, info, warn};
 
 use crate::{config::PushConfig, database::Database, telegram::Message, twitter::Tweet};
 
