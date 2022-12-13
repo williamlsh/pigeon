@@ -1,8 +1,10 @@
 use clap::{Parser, Subcommand};
-use env_logger::Env;
 use pigeon::{App, Config};
 use std::path::PathBuf;
 use tokio::{fs::File, io::AsyncReadExt};
+use tracing_subscriber::{
+    prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, EnvFilter,
+};
 
 #[derive(Parser, Debug)]
 struct Cli {
@@ -32,8 +34,8 @@ enum Command {
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.debug {
-        true => setup_log("debug"),
-        false => setup_log("info"),
+        true => setup_logging("debug"),
+        false => setup_logging("info"),
     }
     let config = load_config(cli.config_path).await?;
     let mut app = App::new(config);
@@ -54,8 +56,13 @@ async fn load_config(path: PathBuf) -> anyhow::Result<Config> {
     Ok(config)
 }
 
-fn setup_log(level: &str) {
-    env_logger::Builder::from_env(Env::default().default_filter_or(level))
-        .format_timestamp_secs()
+fn setup_logging(level: &str) {
+    let fmt_layer = tracing_subscriber::fmt::Layer::default();
+    let filter_layer = EnvFilter::try_from_default_env()
+        .or_else(|_| EnvFilter::try_new(level))
+        .unwrap();
+    tracing_subscriber::registry()
+        .with(fmt_layer)
+        .with(filter_layer)
         .init();
 }

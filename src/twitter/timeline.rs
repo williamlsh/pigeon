@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
-use log::{info, trace, warn};
 use reqwest::Client;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
+use tracing::{info, trace, warn};
 use url::Url;
 
 use super::API_ENDPOINT_BASE;
@@ -202,8 +202,8 @@ impl UrlBuilder {
 
 #[cfg(test)]
 mod tests {
-    use log::debug;
     use reqwest::Client;
+    use tracing::debug;
 
     use super::{PaginationToken, Timeline, Tweets, UrlBuilder, API_ENDPOINT_BASE};
 
@@ -290,11 +290,9 @@ mod tests {
 
     // To test this function:
     // RUST_LOG=debug cargo test tweets -- --ignored '[auth_token]'
-    #[tokio::test]
+    #[test_log::test(tokio::test)]
     #[ignore = "require command line input"]
     async fn tweets() {
-        init();
-
         let mut args = std::env::args().rev();
         let auth_token = args.next().unwrap();
 
@@ -322,9 +320,5 @@ mod tests {
                 debug!("{:#?}", tweet);
             }
         }
-    }
-
-    fn init() {
-        let _ = env_logger::builder().try_init();
     }
 }
