@@ -103,9 +103,11 @@ impl<'a> Timeline<'a> {
             }
             x => {
                 warn!(
-                    "request not successful, got response status: {} and body: {}",
-                    x,
-                    response.text().await.unwrap_or_else(|_| "".to_string())
+                    result = "request not successful",
+                    status = %x,
+                    body = response.text().await.unwrap_or_else(|_| "".to_string()),
+                    query = self.url.query(),
+                    page = self.page,
                 );
                 Ok(None)
             }
