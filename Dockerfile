@@ -17,10 +17,13 @@ RUN cargo build -r
 
 FROM debian:bullseye-slim
 
+Run set -eux; \
+      apt-get update; \
+      apt-get install -y --no-install-recommends \
+      ca-certificates
+
 COPY --from=builder /app/target/release/pigeon /usr/bin/pigeon
 
-USER nobody:nogroup
-
-ENV RUST_LOG=debug
+VOLUME /pigeon
 
 ENTRYPOINT [ "/usr/bin/pigeon" ]
