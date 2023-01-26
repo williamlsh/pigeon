@@ -49,10 +49,10 @@ async fn main() -> anyhow::Result<()> {
 
 async fn load_config(path: PathBuf) -> anyhow::Result<Config> {
     let mut file = File::open(path).await?;
-    let mut buf = Vec::new();
-    file.read_to_end(&mut buf).await?;
+    let mut buf = String::new();
+    file.read_to_string(&mut buf).await?;
 
-    let config: Config = toml::from_slice(&buf)?;
+    let config: Config = toml::from_str(&buf)?;
     Ok(config)
 }
 
