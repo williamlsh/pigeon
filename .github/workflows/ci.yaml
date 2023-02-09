@@ -18,6 +18,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust-toolchain }}
+          profile: minimal
           components: rustfmt,clippy
           override: true
       - uses: rui314/setup-mold@v1
