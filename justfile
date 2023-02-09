@@ -9,3 +9,6 @@ image:
 
 push:
     @sudo docker push {{DOCKER_IMAGE}}:{{IMAGE_TAG}}
+
+release-ci:
+    @cargo dist init --ci=github
