@@ -1,6 +1,6 @@
 [package]
 name = "pigeon"
-version = "0.2.5"
+version = "0.2.12"
 edition = "2021"
 
 [dependencies]
