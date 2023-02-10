@@ -7,6 +7,7 @@ A convenient tool to sync Tweets to Telegram channel(s) written in pure Rust.
 - Poll Twitter users' timeline.
 - Store and display timeline data in and from RocksDB.
 - Push timeline tweets to Telegram channel(s).
+- Pushing can be interrupted and resumed.
 
 ## How to configure?
 
