@@ -53,7 +53,7 @@ impl<'a> Timeline<'a> {
                 0 => self.url.clone(),
                 // The last request.
                 n => {
-                    info!("Finished polling timeline, total pages: {}", n);
+                    info!("Finished polling timeline, total pages: {n}");
                     return Ok(None);
                 }
             },
@@ -160,7 +160,7 @@ impl UrlBuilder {
         let base_url = Url::parse(API_ENDPOINT_BASE).unwrap();
         Url::options()
             .base_url(Some(&base_url))
-            .parse(format!("users/{}/tweets", user_id).as_str())
+            .parse(format!("users/{user_id}/tweets").as_str())
             .map(Self)
             .with_context(|| "Failed to parse url from user_id segment")
     }
@@ -213,7 +213,7 @@ mod tests {
     fn build_url() {
         let url = UrlBuilder::new("123").unwrap().build();
         assert_eq!(
-            format!("{}users/{}/tweets", API_ENDPOINT_BASE, "123"),
+            format!("{API_ENDPOINT_BASE}users/{}/tweets", "123"),
             url.as_str()
         );
     }

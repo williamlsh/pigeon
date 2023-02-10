@@ -43,7 +43,7 @@ impl<'a> Poll<'a> {
             let start_time = Self::fetch_state(self.database, &cfg.username)?;
             // Note: `start_time` in persistent state has higher priority than that in poll config.
             cfg.insert_start_time(start_time);
-            info!("Polling timeline with config: {:?}", cfg);
+            info!("Polling timeline with config: {cfg:?}",);
 
             let endpoint = Self::endpoint(cfg, &user_map)?;
             // Note: `since_id` takes higher priority than `start_time` in request query parameters.
@@ -81,15 +81,15 @@ impl<'a> Poll<'a> {
     }
 
     fn upsert_state(database: &Database, username: &str, created_at: &str) -> Result<()> {
-        trace!("Upsert state: key: {}, value: {}", username, created_at);
+        trace!("Upsert state: key: {username}, value: {created_at}");
         database.put_cf("state", username, created_at)
     }
 
     fn insert_tweet(database: &Database, username: &str, tweet: &Tweet) -> Result<()> {
-        let key = format!("{}:{}", username, tweet.id);
+        let key = format!("{username}:{}", tweet.id);
         let value =
             serde_json::to_vec(&tweet).with_context(|| "could not serialize tweet data to json")?;
-        trace!("Insert tweet: key: {}, value: {:?}", key, tweet);
+        trace!("Insert tweet: key: {key}, value: {tweet:?}");
         database.put_cf("timeline", key, value)
     }
 

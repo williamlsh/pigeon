@@ -27,7 +27,7 @@ impl Database {
     {
         match self.0.cf_handle(cf) {
             Some(cf_handle) => Ok(self.0.put_cf(cf_handle, key, value)?),
-            None => bail!("no such column family: {}", cf),
+            None => bail!("no such column family: {cf}"),
         }
     }
 
@@ -37,7 +37,7 @@ impl Database {
                 .0
                 .get_cf(cf_handle, key)
                 .with_context(|| "could not get value from column family"),
-            None => bail!("no such column family: {}", cf),
+            None => bail!("no such column family: {cf}"),
         }
     }
 
@@ -54,7 +54,7 @@ impl Database {
     {
         match self.0.cf_handle(cf) {
             Some(cf_handle) => Ok(self.0.delete_range_cf(cf_handle, from, to)?),
-            None => bail!("no such column family: {}", cf),
+            None => bail!("no such column family: {cf}"),
         }
     }
 

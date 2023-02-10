@@ -51,7 +51,7 @@ impl Users {
             .base_url(Some(&base_url))
             .parse("users/by")
             .with_context(|| "Failed to parse users look up endpoint")?;
-        url.set_query(Some(format!("usernames={}", usernames).as_str()));
+        url.set_query(Some(format!("usernames={usernames}").as_str()));
 
         Ok(url)
     }
@@ -111,7 +111,7 @@ mod tests {
         let usernames = vec!["john", "mick"];
         let endpoint = Users::endpoint(usernames).unwrap();
         assert_eq!(
-            format!("{}users/by?usernames={}", API_ENDPOINT_BASE, "john,mick"),
+            format!("{API_ENDPOINT_BASE}users/by?usernames={}", "john,mick"),
             endpoint.as_str()
         );
     }

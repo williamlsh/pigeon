@@ -59,9 +59,9 @@ impl<'a> Push<'a> {
                 let (twitter_username, _) = key_str.split_once(':').unwrap();
                 (twitter_username, tweet)
             };
-            debug!("Read {}'s tweet.", twitter_username);
+            debug!("Read {twitter_username}'s tweet.");
             if let Some(telegram_channel) = user_map.get(twitter_username) {
-                debug!("Push tweet to {}", telegram_channel);
+                debug!("Push tweet to {telegram_channel}");
                 let response = Message::new(telegram_channel, tweet)
                     .send(self.client, &self.telegram_token)
                     .await
@@ -77,8 +77,7 @@ impl<'a> Push<'a> {
                     StatusCode::OK => time::sleep(Duration::from_secs(3)).await,
                     other => {
                         warn!(
-                            "Request not successful, got response status: {} and body: {}",
-                            other,
+                            "Request not successful, channel: {telegram_channel}, response status: {other}, body: {}",
                             response.text().await.unwrap_or_else(|_| "".to_string())
                         );
                         info!("Stop pushing and deleting pushed tweets in database.");

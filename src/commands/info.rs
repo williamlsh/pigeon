@@ -32,7 +32,7 @@ fn display_timeline(database: &Database) -> anyhow::Result<()> {
         let (key, value) = entry?;
         let key_str = str::from_utf8(&key)?;
         let value_str: Tweet = serde_json::from_slice(&value)?;
-        println!("  {} = {:?}", key_str, value_str);
+        println!("  {key_str} = {value_str:?}");
     }
     Ok(())
 }
