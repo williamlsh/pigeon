@@ -47,6 +47,12 @@ You can also download pre-built binary from latest [release](https://github.com/
 
 ## Proxy
 
+To use a network proxy, you have to build pigeon with `socks` feature enabled:
+
+```
+cargo build --release --features socks
+```
+
 You can specify HTTP/HTTPS or Socks5 proxy for all network connections from Pigeon through environment variables. For instance:
 
 To use an HTTP proxy:
