@@ -17,7 +17,7 @@ pub(crate) struct Message {
 impl Message {
     pub(crate) fn new(channel: &str, tweet: Tweet) -> Self {
         Self {
-            chat_id: format!("@{channel}"),
+            chat_id: format!("{channel}"),
             text: format!("{}\n\n{}", tweet.text, tweet.created_at),
         }
     }
