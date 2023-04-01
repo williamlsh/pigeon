@@ -17,4 +17,4 @@ since_id = "xyz"                        # Tweet id to continue to poll, optioanl
 [[push]]
 included = true       # Whether this channel is included for pushing
 from = "TwitterDev"   # From which Twitter user's timeline for pushing
-username = "some_bot" # Telegram channel
+username = "@some_bot" # Telegram channel
