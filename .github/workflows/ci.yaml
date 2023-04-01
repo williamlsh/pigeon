@@ -1,4 +1,13 @@
-on: [workflow_dispatch, push, pull_request]
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    paths-ignore:
+      - .github
+      - config.toml
+      - Dockerfile
+      - justfile
+      - README.md
 
 name: Test and Build
 
@@ -37,7 +46,3 @@ jobs:
           args: --all-features -- -W clippy::all
       - name: Test code
         run: cargo nextest run --all-targets --test-threads=1
-      # - name: Audit code
-      #   uses: actions-rs/audit-check@v1
-      #   with:
-      #     token: ${{ secrets.GITHUB_TOKEN }}
