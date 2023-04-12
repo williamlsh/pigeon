@@ -69,7 +69,7 @@ impl<'a> Timeline<'a> {
         // Check response status.
         match response.status() {
             StatusCode::OK => {
-                let mut timeline: Tweets = response
+                let timeline: Tweets = response
                     .json()
                     .await
                     .with_context(|| "Failed to deserialize json response")?;
@@ -78,9 +78,7 @@ impl<'a> Timeline<'a> {
                 // Keep the pagination token for next request.
                 self.pagination_token = timeline
                     .meta
-                    .next_token
-                    .take()
-                    .map(PaginationToken::NextToken);
+                    .and_then(|mut meta| meta.next_token.take().map(PaginationToken::NextToken));
 
                 // Increase page number on request success.
                 match timeline.data {
@@ -133,7 +131,7 @@ impl<'a> Timeline<'a> {
 #[derive(Debug, Deserialize, Clone)]
 pub(crate) struct Tweets {
     data: Option<Vec<Data>>,
-    meta: Meta,
+    meta: Option<Meta>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
