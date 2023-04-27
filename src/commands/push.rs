@@ -1,7 +1,11 @@
 use anyhow::{anyhow, Context, Result};
 use reqwest::{Client, StatusCode};
 use std::{collections::HashMap, str, time::Duration};
-use tokio::time;
+use tokio::{
+    signal,
+    sync::oneshot::{self, Receiver},
+    time,
+};
 use tracing::{debug, info, warn};
 
 use crate::{config::PushConfig, database::Database, telegram::Message, twitter::Tweet};
@@ -21,6 +25,8 @@ pub(crate) struct Push<'a> {
     first_entry: Option<Box<[u8]>>,
     /// The last entry when reading timeline column family for pushing.
     last_entry: Option<Box<[u8]>>,
+    /// Shutdown notify.
+    notify: Receiver<()>,
 }
 
 impl<'a> Push<'a> {
@@ -31,6 +37,7 @@ impl<'a> Push<'a> {
         database: &'a mut Database,
     ) -> Result<Self> {
         let telegram_token = telegram_token.ok_or_else(|| anyhow!("Empty Telegram token"))?;
+        let notify = shutdown();
         Ok(Self {
             telegram_token,
             config,
@@ -38,6 +45,7 @@ impl<'a> Push<'a> {
             database,
             first_entry: None,
             last_entry: None,
+            notify,
         })
     }
 
@@ -87,6 +95,11 @@ impl<'a> Push<'a> {
                     }
                 }
             }
+            // Check shutdown signal at the end.
+            if self.notify.try_recv().is_ok() {
+                self.last_entry = Some(key);
+                break;
+            }
         }
         Ok(())
     }
@@ -121,4 +134,16 @@ impl<'a> Drop for Push<'a> {
     fn drop(&mut self) {
         let _ = self.tidy_database();
     }
+}
+
+/// Handles user interrupt signal.
+fn shutdown() -> Receiver<()> {
+    let (tx, rx) = oneshot::channel();
+    tokio::spawn(async move {
+        signal::ctrl_c().await.expect("failed to listen for event");
+        info!("received ctrl-c event");
+
+        let _ = tx.send(());
+    });
+    rx
 }
