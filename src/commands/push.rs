@@ -60,6 +60,12 @@ impl<'a> Push<'a> {
                 self.first_entry = Some(key.clone());
             }
 
+            // Check shutdown signal first.
+            if self.notify.try_recv().is_ok() {
+                self.last_entry = Some(key);
+                break;
+            }
+
             let (twitter_username, tweet) = {
                 let key_str = str::from_utf8(&key)?;
                 let tweet: Tweet = serde_json::from_slice(&value)?;
@@ -94,11 +100,6 @@ impl<'a> Push<'a> {
                         break;
                     }
                 }
-            }
-            // Check shutdown signal at the end.
-            if self.notify.try_recv().is_ok() {
-                self.last_entry = Some(key);
-                break;
             }
         }
         Ok(())
