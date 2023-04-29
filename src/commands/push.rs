@@ -25,8 +25,8 @@ pub(crate) struct Push<'a> {
     first_entry: Option<Box<[u8]>>,
     /// The last entry when reading timeline column family for pushing.
     last_entry: Option<Box<[u8]>>,
-    /// Shutdown notify.
-    notify: Receiver<()>,
+    /// Shutdown signal.
+    signal: Receiver<()>,
 }
 
 impl<'a> Push<'a> {
@@ -37,7 +37,7 @@ impl<'a> Push<'a> {
         database: &'a mut Database,
     ) -> Result<Self> {
         let telegram_token = telegram_token.ok_or_else(|| anyhow!("Empty Telegram token"))?;
-        let notify = shutdown();
+        let signal = shutdown_signal();
         Ok(Self {
             telegram_token,
             config,
@@ -45,7 +45,7 @@ impl<'a> Push<'a> {
             database,
             first_entry: None,
             last_entry: None,
-            notify,
+            signal,
         })
     }
 
@@ -61,7 +61,7 @@ impl<'a> Push<'a> {
             }
 
             // Check shutdown signal first.
-            if self.notify.try_recv().is_ok() {
+            if self.signal.try_recv().is_ok() {
                 self.last_entry = Some(key);
                 break;
             }
@@ -138,7 +138,7 @@ impl<'a> Drop for Push<'a> {
 }
 
 /// Handles user interrupt signal.
-fn shutdown() -> Receiver<()> {
+fn shutdown_signal() -> Receiver<()> {
     let (tx, rx) = oneshot::channel();
     tokio::spawn(async move {
         signal::ctrl_c().await.expect("failed to listen for event");
