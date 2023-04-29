@@ -82,7 +82,6 @@ impl<'a> Push<'a> {
                     .with_context(|| "Failed to send message to Telegram channel")
                     .map_err(|err| {
                         // This error check is necessary in order to tidy database despite error or panic.
-                        info!("An error happened when requesting, will stop pushing and delete pushed tweets in database.");
                         self.last_entry = Some(key.clone());
                         err
                     })?;
@@ -94,7 +93,6 @@ impl<'a> Push<'a> {
                             "Request not successful, channel: {telegram_channel}, response status: {other}, body: {}",
                             response.text().await.unwrap_or_else(|_| "".to_string())
                         );
-                        info!("Stop pushing and deleting pushed tweets in database.");
                         // Keep the last entry key.
                         self.last_entry = Some(key);
                         break;
@@ -108,6 +106,7 @@ impl<'a> Push<'a> {
     fn tidy_database(&mut self) -> Result<()> {
         match (self.first_entry.take(), self.last_entry.take()) {
             (Some(first_entry), Some(last_entry)) => {
+                info!("Push stopped, deleting pushed tweets in database.");
                 self.database
                     .delete_range_cf("timeline", first_entry, last_entry)
             }
@@ -142,8 +141,7 @@ fn shutdown_signal() -> Receiver<()> {
     let (tx, rx) = oneshot::channel();
     tokio::spawn(async move {
         signal::ctrl_c().await.expect("failed to listen for event");
-        info!("received ctrl-c event");
-
+        info!("Received ctrl-c signal.");
         let _ = tx.send(());
     });
     rx
