@@ -2,7 +2,10 @@ use anyhow::{anyhow, Context, Result};
 use reqwest::{Client, StatusCode};
 use std::{collections::HashMap, str, time::Duration};
 use tokio::{
-    signal,
+    signal::{
+        self,
+        unix::{signal as unix_signal, SignalKind},
+    },
     sync::oneshot::{self, Receiver},
     time,
 };
@@ -136,12 +139,25 @@ impl<'a> Drop for Push<'a> {
     }
 }
 
-/// Handles user interrupt signal.
+/// Handles user shutdown signals.
 fn shutdown_signal() -> Receiver<()> {
     let (tx, rx) = oneshot::channel();
     tokio::spawn(async move {
-        signal::ctrl_c().await.expect("failed to listen for event");
-        info!("Received ctrl-c signal.");
+        let mut terminate_stream =
+            unix_signal(SignalKind::terminate()).expect("failed to listen for event");
+        let mut hangup_stream =
+            unix_signal(SignalKind::hangup()).expect("failed to listen for event");
+        let mut quit_stream = unix_signal(SignalKind::quit()).expect("failed to listen for event");
+        tokio::select! {
+            completion = signal::ctrl_c() => {
+                completion.expect("failed to listen for event");
+                info!("Received ctrl-c signal.");
+            },
+            _ = terminate_stream.recv()=> info!("Received SIGTERM signal."),
+            _ = hangup_stream.recv()=> info!("Received SIGHUP signal."),
+            _ = quit_stream.recv()=> info!("Received SIGQUIT signal."),
+        }
+
         let _ = tx.send(());
     });
     rx
