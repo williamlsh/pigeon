@@ -1,20 +1,20 @@
-rocksdb_path = "rocksdb" # Path to Rocksdb
+rocksdb_path = "rocksdb" # Path to where RocksDB stores data
 twitter_token = "xxx"    # Twitter API token
 telegram_token = "xxx"   # Telegram Bot API token
 
-# Poll Twitter timeline from user(s)
-# Note: Pigeon uses `start_time` and `end_time` when it runs for the first time.
-# After first running, it will continue polling from the latest state which it kept from RocksDB.
+# Poll Twitter timeline(s)
+# Note: When Pigeon runs for the first time, it will start polling from `start_time` until `end_time`.
+# After the initial run, it will continue polling from where it left off based on the latest data stored in RocksDB.
 [[poll]]
-included = true                         # Whether this Twitter user's timeline is included for polling
-username = "TwitterDev"                 # Twitter username
-max_results = 5                         # Max results per page of timeline when polling, optioanl, default to 100
-start_time = "2022-10-25T00:00:00.000Z" # Start time of timeline to poll, optioanl, default to oldest time
-end_time = "2022-11-01T00:00:00.000Z"   # End time of timeline to poll, optioanl, default to present time
-since_id = "xyz"                        # Tweet id in timeline to continue polling, optioanl
+included = true                         # Whether to include this Twitter user's timeline for polling
+username = "TwitterDev"                 # Twitter username for this timeline
+max_results = 5                         # Maximum number of tweets per page when polling, default is 100
+start_time = "2022-10-25T00:00:00.000Z" # The start time of the timeline to poll, default is the oldest time available
+end_time = "2022-11-01T00:00:00.000Z"   # The end time of the timeline to poll, default is the current time
+since_id = "xyz"                        # The tweet ID to resume polling from (optional)
 
 # Push polled timeline data to Telegram channel(s)
 [[push]]
-included = true                     # Whether this channel is included for pushing
-from = "TwitterDev"                 # From which Twitter user's timeline for pushing
-username = "@some_channel_username" # Channel username for public Telegram channel or chat id for private one, see: https://core.telegram.org/bots/api#sendmessage
+included = true                     # Whether to include this channel for pushing
+from = "TwitterDev"                 # The Twitter user's timeline to push from
+username = "@some_channel_username" # The Telegram channel username (for public channels) or chat ID (for private channels), see: https://core.telegram.org/bots/api#sendmessage
