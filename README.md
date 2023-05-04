@@ -1,25 +1,27 @@
 # Pigeon
 
-A convenient tool to sync Tweets to Telegram channel(s) written in pure Rust.
+A Convenient Tool for Syncing Tweets to Telegram Channels.
 
-## Features
+Pigeon is a powerful tool written in pure Rust that allows you to seamlessly sync Tweets to Telegram channel(s). With its user-friendly features and efficient functionality, Pigeon simplifies the process of keeping your Telegram channels up-to-date with the latest Twitter content.
 
-- Poll Twitter users' timeline.
-- Store and display timeline data in and from RocksDB.
-- Push timeline tweets to Telegram channel(s).
-- Pushing can be interrupted and resumed.
+## Key Features
 
-## How to configure?
+- Poll Twitter timelines
+- Store and display data using RocksDB
+- Push Tweets to Telegram channels
+- Interruptible and resumable pushing
+- No limits on the number of Twitter users and Telegram channels
 
-See [config.toml](config.toml) for example.
+## Configuration?
 
-To get a Twitter API token, see: [How to get access to the Twitter API](https://developer.twitter.com/en/docs/twitter-api/getting-started/getting-access-to-the-twitter-api).
+To configure Pigeon, refer to the provided [config.toml](config.toml) file for an example setup. Additionally, you'll need to obtain the following API tokens:
 
-To get a Telegram Bot API token, see: [Creating a new bot](https://core.telegram.org/bots/features#creating-a-new-bot).
+- Twitter API token: Visit "[How to get access to the Twitter API](https://developer.twitter.com/en/docs/twitter-api/getting-started/getting-access-to-the-twitter-api)" for instructions on obtaining this token.
+- Telegram Bot API token: Follow the guide on "[Creating a new bot](https://core.telegram.org/bots/features#creating-a-new-bot.)" to acquire the necessary token.
 
-## How to use
+## Usage
 
-Build binary:
+To build the Pigeon binary, use the following command:
 
 ```
 cargo build --release
@@ -43,17 +45,17 @@ Options:
   -h, --help                       Print help information
 ```
 
-You can also download pre-built binary from latest [release](https://github.com/williamlsh/pigeon/releases) or use a [Pigeon](https://github.com/users/williamlsh/packages/container/package/pigeon) Docker image instead.
+Alternatively, you can download the pre-built binary from the latest [release](https://github.com/williamlsh/pigeon/releases) or utilize the [Pigeon](https://github.com/users/williamlsh/packages/container/package/pigeon) Docker image.
 
-## Proxy
+## Proxy Support
 
-To use a network proxy, you have to build pigeon with `socks` feature enabled:
+If you require network proxy usage, build Pigeon with `socks` feature enabled:
 
 ```
 cargo build --release --features socks
 ```
 
-You can specify HTTP/HTTPS or Socks5 proxy for all network connections from Pigeon through environment variables. For instance:
+You can set up an HTTP/HTTPS or Socks5 proxy for all network connections through environment variables. For example:
 
 To use an HTTP proxy:
 
@@ -61,16 +63,20 @@ To use an HTTP proxy:
 export HTTP_PROXY=http://secure.example
 ```
 
-Or to use an Socks5 proxy:
+To use a Socks5 proxy:
 
 ```
 export https_proxy=socks5://127.0.0.1:1086
 ```
 
-## Local data
+## Local Data
 
-All tweets data is stored in RocksDB in a local path that you specified when running Pigeon. Tweets that are pushed to Telegram channel(s) will automatically be deleted. No garbage data will remain in your disk storage.
+Pigeon stores all tweet data locally in RocksDB, which resides in the specified path during runtime. Tweets pushed to Telegram channel(s) are automatically deleted, ensuring no unnecessary data clutters your disk storage.
 
 ## Author
 
-- [William](https://github.com/williamlsh)
+Pigeon was developed by [William](https://github.com/williamlsh), offering a robust solution for syncing Tweets to Telegram channels efficiently and effortlessly.
+
+## License
+
+MIT License
