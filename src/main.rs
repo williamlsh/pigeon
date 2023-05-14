@@ -13,7 +13,7 @@ struct Cli {
     debug: bool,
 
     /// Config file path
-    #[arg(short, long, value_name = "config.toml")]
+    #[arg(short, long, default_value = "config.toml", value_name = "config.toml")]
     config_path: PathBuf,
 
     #[command(subcommand)]
@@ -26,7 +26,7 @@ enum Command {
     Poll,
     /// Push timeline to Telegram channel(s)
     Push,
-    /// Display overview information about Database
+    /// Display overview information from Database
     Info,
 }
 
