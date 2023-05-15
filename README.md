@@ -31,18 +31,18 @@ General commands:
 
 ```
 $ target/release/pigeon --help
-Usage: pigeon [OPTIONS] --config-path <config.toml> <COMMAND>
+Usage: pigeon [OPTIONS] <COMMAND>
 
 Commands:
   poll  Poll Twitter users' timeline
   push  Push timeline to Telegram channel(s)
-  info  Display overview information about Database
+  info  Display overview information from Database
   help  Print this message or the help of the given subcommand(s)
 
 Options:
   -d, --debug                      Activate debug mode
-  -c, --config-path <config.toml>  Config file path
-  -h, --help                       Print help information
+  -c, --config-path <config.toml>  Config file path [default: config.toml]
+  -h, --help                       Print help                       Print help information
 ```
 
 Alternatively, you can download the pre-built binary from the latest [release](https://github.com/williamlsh/pigeon/releases) or utilize the [Pigeon](https://github.com/users/williamlsh/packages/container/package/pigeon) Docker image.
