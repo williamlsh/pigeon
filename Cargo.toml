@@ -17,7 +17,7 @@ tokio = { version = "1.34", features = ["full"] }
 toml = "0.8"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-url = "2.4"
+url = "2.5"
 
 [features]
 socks = ["reqwest/socks"]
